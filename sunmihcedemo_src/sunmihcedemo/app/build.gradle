@@ -1,0 +1,61 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.sunmi.hce.demo'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.sunmi.hce.demo"
+        minSdk 25
+        targetSdk 33
+        versionCode 4
+        versionName "v1.0.3"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    android.applicationVariants.all { variant ->
+        def defOutputDir = variant.getPackageApplicationProvider().get().outputDirectory.getAsFile().get().getPath()
+        def targetDir = "${project.buildDir}/outputs/apk"
+        variant.outputs.all {
+            outputFileName = "SunmiHCEDemo_${versionName}_${buildType.name}.apk"
+            variant.assembleProvider.get().doLast {
+                copy {
+                    from defOutputDir
+                    into targetDir
+                    include "**/*.apk"
+                }
+                File dir = file("${targetDir}/${flavorName}")
+                delete new File(dir, "${buildType.name}")
+                if (dir.list().length == 0) {
+                    delete dir
+                }
+            }
+        }
+    }
+}
+
+//tasks.configureEach { task ->
+//    if (task.name.contains("ListingFileRedirect")) {// 过滤release
+//        task.enabled = false
+//    }
+//}
+
+dependencies {
+    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.5.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}

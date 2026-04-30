@@ -1,0 +1,64 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    compileSdk 33
+    ndkVersion "21.0.6113669"
+    lintOptions {
+        abortOnError false
+        disable 'GoogleAppIndexingWarning'
+        disable 'NonConstantResourceId'
+    }
+
+    defaultConfig {
+        applicationId "com.sunmi.nfc.demo"
+        minSdk 25
+        targetSdk 33
+        versionCode 3
+        versionName "v1.0.2"
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+        }
+
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    android.applicationVariants.all { variant ->
+        variant.outputs.all {
+            variant.packageApplicationProvider.get().outputDirectory = new File("${project.buildDir}/outputs/apk")
+            outputFileName = "SunmiNFCDemo_${versionName}_${buildType.name}.apk"
+            variant.getAssembleProvider().configure() {
+                it.doLast {
+                    delete new File('build/outputs/apk/output-metadata.json');
+                }
+            }
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name.contains("ListingFileRedirect")) {// 过滤release
+        task.enabled = false
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.5.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+}

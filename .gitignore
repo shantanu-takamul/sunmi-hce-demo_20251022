@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE - IntelliJ / Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Android build outputs
+build/
+*/build/
+**/build/
+
+# Gradle
+.gradle/
+*/.gradle/
+**/.gradle/
+gradle-app.setting
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local config (contains machine-specific SDK paths — never commit)
+local.properties
+*/local.properties
+
+# Pre-built binaries / archives
+*.apk
+*.aab
+*.aar
+*.rar
+*.zip
+
+# Markdown docs (project-specific decision)
+*.md
+
+# Captures / profiling
+captures/
+.externalNativeBuild/
+.cxx/
+
+# keystore files
+*.jks
+*.keystore
+keystore.properties
+
+# Logs
+*.log
