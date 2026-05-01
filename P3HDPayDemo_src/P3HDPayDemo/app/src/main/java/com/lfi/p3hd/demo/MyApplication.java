@@ -1,0 +1,54 @@
+package com.lfi.p3hd.demo;
+
+import android.app.Application;
+import android.util.Log;
+
+import com.sunmi.pay.hardware.aidlv2.print.PrinterOptV2;
+import com.sunmi.pay.hardware.aidlv2.readcard.ReadCardOptV2;
+import com.sunmi.pay.hardware.wrapper.HCEManagerV2Wrapper;
+
+import sunmi.paylib.SunmiPayKernel;
+
+public class MyApplication extends Application {
+    private static final String TAG = "MyApplication";
+    public static MyApplication app;
+
+    public HCEManagerV2Wrapper hceManagerV2;
+    public ReadCardOptV2 readCardOptV2;
+    public PrinterOptV2 printerOptV2;
+    private boolean connectPaySDK;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        app = this;
+        bindPaySDKService();
+    }
+
+    public boolean isConnectPaySDK() {
+        return connectPaySDK;
+    }
+
+    public void bindPaySDKService() {
+        final SunmiPayKernel payKernel = SunmiPayKernel.getInstance();
+        payKernel.initPaySDK(this, new SunmiPayKernel.ConnectCallback() {
+            @Override
+            public void onConnectPaySDK() {
+                Log.d(TAG, "onConnectPaySDK");
+                hceManagerV2 = payKernel.mHCEManagerV2Wrapper;
+                readCardOptV2 = payKernel.mReadCardOptV2;
+                printerOptV2 = payKernel.mPrinterOptV2;
+                connectPaySDK = true;
+            }
+
+            @Override
+            public void onDisconnectPaySDK() {
+                Log.d(TAG, "onDisconnectPaySDK");
+                connectPaySDK = false;
+                hceManagerV2 = null;
+                readCardOptV2 = null;
+                printerOptV2 = null;
+            }
+        });
+    }
+}
