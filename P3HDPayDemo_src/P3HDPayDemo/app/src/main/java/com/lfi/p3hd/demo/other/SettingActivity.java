@@ -100,11 +100,7 @@ public class SettingActivity extends BaseAppCompatActivity {
                 PreferencesUtil.setWalletId(walletId.isEmpty() ? QRConfig.WALLET_ID : walletId);
                 PreferencesUtil.setLfiApiKey("");
                 updateDisplay();
-                if (selectedEnv.equals("local")) {
-                    showToast("Env set to local");
-                } else {
-                    fetchLfiApiKey();
-                }
+                fetchLfiApiKey();
             })
             .setNegativeButton(android.R.string.cancel, null)
             .show();
