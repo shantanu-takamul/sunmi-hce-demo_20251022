@@ -116,7 +116,7 @@ public class QRPayActivity extends BaseAppCompatActivity {
             String requestId = UUID.randomUUID().toString();
             lastRequestId = requestId;
             showLoadingState();
-            generateQR(amountFils, amountStr, requestId, false);
+            generateQR(amountFils, amountStr, requestId);
         } catch (NumberFormatException e) {
             showToast(R.string.qr_pay_amount_error);
         }
@@ -128,17 +128,18 @@ public class QRPayActivity extends BaseAppCompatActivity {
             if (amountStr.endsWith(".")) amountStr = amountStr.substring(0, amountStr.length() - 1);
             double amountAed = Double.parseDouble(amountStr);
             if (amountAed <= 0) throw new NumberFormatException("zero");
-            long amountFils = Math.round(amountAed * 100);
-            String requestId = UUID.randomUUID().toString();
-            lastRequestId = requestId;
-            showLoadingState();
-            generateQR(amountFils, amountStr, requestId, true);
+            // NFC pay writes wallet info directly to HCE — no API call needed.
+            // The iOS ddwallet app reads walletId + amount from the tag and
+            // initiates the P2M transfer entirely on the phone side.
+            Intent intent = new Intent(this, NFCPayActivity.class);
+            intent.putExtra(NFCPayActivity.EXTRA_AMOUNT_AED, amountStr);
+            startActivity(intent);
         } catch (NumberFormatException e) {
             showToast(R.string.qr_pay_amount_error);
         }
     }
 
-    private void generateQR(long amountFils, String amountDisplayAed, String requestId, boolean nfcMode) {
+    private void generateQR(long amountFils, String amountDisplayAed, String requestId) {
         try {
             JSONObject body = new JSONObject();
             String walletId = PreferencesUtil.getWalletId();
@@ -185,27 +186,12 @@ public class QRPayActivity extends BaseAppCompatActivity {
                     try {
                         JSONObject json = new JSONObject(responseBody);
                         String emvPayload = json.getString("emvPayload");
-
                         runOnUiThread(() -> {
-                            if (nfcMode) {
-                                String paymentUrl = "https://pay.lfi.ae/nfc?token=" + requestId;
-                                try {
-                                    if (json.has("paymentUrl") && !json.getString("paymentUrl").isEmpty()) {
-                                        paymentUrl = json.getString("paymentUrl");
-                                    }
-                                } catch (Exception ignored) {}
-                                Intent intent = new Intent(QRPayActivity.this, NFCPayActivity.class);
-                                intent.putExtra(NFCPayActivity.EXTRA_AMOUNT_AED, amountDisplayAed);
-                                intent.putExtra(NFCPayActivity.EXTRA_REQUEST_ID, requestId);
-                                intent.putExtra(NFCPayActivity.EXTRA_PAYMENT_URL, paymentUrl);
-                                startActivity(intent);
-                            } else {
-                                Intent intent = new Intent(QRPayActivity.this, QRDisplayActivity.class);
-                                intent.putExtra(QRDisplayActivity.EXTRA_EMV_PAYLOAD, emvPayload);
-                                intent.putExtra(QRDisplayActivity.EXTRA_AMOUNT_AED, amountDisplayAed);
-                                intent.putExtra(QRDisplayActivity.EXTRA_REQUEST_ID, requestId);
-                                startActivity(intent);
-                            }
+                            Intent intent = new Intent(QRPayActivity.this, QRDisplayActivity.class);
+                            intent.putExtra(QRDisplayActivity.EXTRA_EMV_PAYLOAD, emvPayload);
+                            intent.putExtra(QRDisplayActivity.EXTRA_AMOUNT_AED, amountDisplayAed);
+                            intent.putExtra(QRDisplayActivity.EXTRA_REQUEST_ID, requestId);
+                            startActivity(intent);
                         });
                     } catch (Exception e) {
                         runOnUiThread(() -> {
