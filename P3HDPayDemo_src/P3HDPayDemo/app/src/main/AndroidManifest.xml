@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Sunmi Pay SDK permissions -->
+    <uses-permission android:name="com.sunmi.hardware.CONTACTLESS_CARD" />
+    <uses-permission android:name="com.sunmi.hardware.ICC" />
+    <uses-permission android:name="com.sunmi.hardware.MSR" />
+    <uses-permission android:name="com.sunmi.hardware.PINPAD" />
+    <uses-permission android:name="com.sunmi.hardware.SECURITY" />
+    <uses-permission android:name="com.sunmi.hardware.LED" />
+
+    <!-- Standard permissions -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".qr.QRPayActivity"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".qr.QRDisplayActivity"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".qr.PaymentSuccessActivity"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".qr.QRExpiredActivity"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".nfc.NFCPayActivity"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".nfc.NFCReadActivity"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".hce.HCEActivity"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".hce.HCEReceiptActivity"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+        <activity
+            android:name=".other.SettingActivity"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
+    </application>
+</manifest>

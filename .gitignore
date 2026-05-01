@@ -28,7 +28,8 @@ local.properties
 # Pre-built binaries / archives
 *.apk
 *.aab
-*.aar
+# *.aar excluded from build outputs but NOT from app/libs (vendor SDK)
+build/**/*.aar
 *.rar
 *.zip
 
@@ -47,3 +48,8 @@ keystore.properties
 
 # Logs
 *.log
+
+# Sunmi PayLib AAR extraction artifacts (leak to repo root when AAR is unpacked by IDE)
+/META-INF/
+/com/
+/sunmi/
