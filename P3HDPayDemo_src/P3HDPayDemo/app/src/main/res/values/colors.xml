@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand blue — used for toolbars, primary actions -->
+    <color name="primary">#1565C0</color>
+    <color name="primary_dark">#003c8f</color>
+    <color name="accent">#1565C0</color>
+
+    <!-- Page / layout backgrounds -->
+    <color name="background">#F4F6F9</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="card">#FFFFFF</color>
+
+    <!-- Semantic -->
+    <color name="success">#2E7D32</color>
+    <color name="warning">#E65100</color>
+    <color name="error">#C62828</color>
+
+    <!-- Text -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_dark">#212121</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Dividers / borders -->
+    <color name="divider">#E0E0E0</color>
+
+    <!-- Numpad -->
+    <color name="numpad_bg">#FFFFFF</color>
+    <color name="numpad_text">#212121</color>
+
+    <!-- Secondary / cancel buttons -->
+    <color name="btn_secondary">#607D8B</color>
+</resources>

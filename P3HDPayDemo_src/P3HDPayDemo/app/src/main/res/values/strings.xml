@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">P3HD Pay Demo</string>
+
+    <!-- Main -->
+    <string name="main_title">P3HD Pay Demo</string>
+    <string name="card_qr_payment">QR Payment</string>
+    <string name="card_nfc_payment">NFC Payment</string>
+    <string name="card_hce_emulate">HCE Emulate</string>
+    <string name="card_hce_receipt">HCE Receipt</string>
+    <string name="card_nfc_read">NFC Read Card</string>
+    <string name="card_settings">Settings</string>
+
+    <!-- QR Pay -->
+    <string name="qr_pay">QR Pay</string>
+    <string name="qr_pay_amount_hint">AED</string>
+    <string name="qr_pay_amount_error">Please enter a valid amount greater than 0</string>
+    <string name="qr_pay_error_network">Network error</string>
+    <string name="qr_pay_error_parse">Invalid response from server</string>
+    <string name="qr_pay_status_generating">Generating QR code\u2026</string>
+    <string name="qr_pay_scan_instruction">Ask customer to scan QR code</string>
+    <string name="qr_pay_generate">Generate QR</string>
+    <string name="qr_pay_nfc">NFC Pay</string>
+
+    <!-- QR Display -->
+    <string name="qr_display_title">QR Payment</string>
+    <string name="qr_cancel">Cancel</string>
+
+    <!-- Success -->
+    <string name="payment_success_title">Payment Successful</string>
+    <string name="payment_success_heading">Payment Successful!</string>
+    <string name="payment_success_print">Print Receipt</string>
+    <string name="payment_success_return">Return to QR</string>
+
+    <!-- Expired -->
+    <string name="qr_expired_title">QR Expired</string>
+    <string name="qr_expired_heading">QR Code Expired</string>
+    <string name="qr_expired_message">This QR code has timed out. Please generate a new one to accept payment.</string>
+    <string name="qr_expired_return">Return to QR</string>
+
+    <!-- Toasts -->
+    <string name="qr_pay_expired">QR code has expired</string>
+    <string name="qr_pay_failed">Payment failed</string>
+    <string name="sdk_not_connected">Connecting to SDK\u2026</string>
+
+    <!-- NFC Pay -->
+    <string name="nfc_pay_title">NFC Payment</string>
+    <string name="nfc_pay_instruction">Tap your phone to this device</string>
+    <string name="nfc_pay_subtitle">Hold customer&#8217;s phone near the screen</string>
+
+    <!-- HCE -->
+    <string name="hce_title">HCE Emulate</string>
+    <string name="hce_open">Open HCE</string>
+    <string name="hce_write">Write NDEF</string>
+    <string name="hce_read">Read NDEF</string>
+    <string name="hce_close">Close HCE</string>
+    <string name="hce_type2">NFC Type 2</string>
+    <string name="hce_type4">NFC Type 4</string>
+    <string name="hce_data_label">Preset:</string>
+    <string name="hce_ndef_hint">Enter NDEF text or URL\u2026</string>
+
+    <!-- HCE Receipt -->
+    <string name="hce_receipt_title">HCE Receipt</string>
+    <string name="hce_receipt_url_hint">https://pay.lfi.ae/receipt/&#8230;</string>
+    <string name="hce_enable_nfc">Enable NFC Tap</string>
+    <string name="hce_close_btn">Close</string>
+
+    <!-- NFC Read -->
+    <string name="nfc_read_title">NFC Read Card</string>
+    <string name="nfc_read_start">Start Scan</string>
+    <string name="nfc_read_stop">Stop</string>
+    <string name="nfc_read_waiting">Waiting for NFC card\u2026</string>
+    <string name="nfc_read_result_label">Result:</string>
+
+    <!-- Settings -->
+    <string name="setting_title">Settings</string>
+    <string name="setting_env_label">LFI Environment</string>
+    <string name="setting_env_title">Select Environment</string>
+    <string name="setting_change">Change</string>
+    <string name="setting_api_key_label">API Key</string>
+    <string name="setting_refresh">Refresh</string>
+    <string name="setting_wallet_id_label">Wallet ID</string>
+    <string name="setting_wallet_id_title">Enter Wallet ID</string>
+</resources>
