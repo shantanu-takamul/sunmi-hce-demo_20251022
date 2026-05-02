@@ -1,12 +1,15 @@
 package com.lfi.p3hd.demo.qr;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.view.animation.AccelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -37,22 +40,30 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
     public static final String EXTRA_EMV_PAYLOAD = "emvPayload";  // kept for caller compatibility
 
     private static final int PAPER_WIDTH_DOTS = 384;
-    private static final long PRINT_ANIMATION_MS = 900L;
+    private static final long MIN_PRINT_ANIMATION_MS = 4200L;
+    private static final long MAX_PRINT_ANIMATION_MS = 8500L;
 
     private String amountAed;
     private String requestId;
     private String dateTimeStr;
 
     private View layoutSuccessSummary;
+    private View layoutPrintedSuccess;
     private View cardReceipt;
     private View receiptContent;
     private ProgressBar progressDetails;
     private ScrollView scrollReceipt;
     private MaterialButton primaryButton;
+    private MaterialButton returnButton;
 
     private ReceiptDetails receiptDetails;
     private boolean detailsLoading;
     private boolean printInProgress;
+    private boolean printJobDone;
+    private boolean printJobSucceeded;
+    private boolean printAnimationDone;
+    private boolean printAnimationCancelled;
+    private ValueAnimator receiptAnimator;
 
     private final OkHttpClient httpClient = new OkHttpClient();
 
@@ -72,11 +83,13 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
         initActionbar(R.string.payment_success_title);
 
         layoutSuccessSummary = findViewById(R.id.layout_success_summary);
+        layoutPrintedSuccess = findViewById(R.id.layout_printed_success);
         cardReceipt = findViewById(R.id.card_receipt);
         receiptContent = findViewById(R.id.layout_receipt_content);
         progressDetails = findViewById(R.id.progress_details);
         scrollReceipt = findViewById(R.id.scroll_receipt);
         primaryButton = findViewById(R.id.btn_primary);
+        returnButton = findViewById(R.id.btn_return);
 
         ((TextView) findViewById(R.id.tv_amount)).setText("AED " + safeText(amountAed));
         ((TextView) findViewById(R.id.tv_ref)).setText("Ref: " + getShortRef(requestId));
@@ -89,7 +102,7 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
                 printReceiptWithAnimation();
             }
         });
-        findViewById(R.id.btn_return).setOnClickListener(v -> finish());
+        returnButton.setOnClickListener(v -> finish());
     }
 
     private void loadTransactionDetails() {
@@ -224,6 +237,7 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
 
         progressDetails.setVisibility(View.GONE);
         layoutSuccessSummary.setVisibility(View.GONE);
+        layoutPrintedSuccess.setVisibility(View.GONE);
         cardReceipt.setAlpha(1f);
         cardReceipt.setTranslationY(0f);
         cardReceipt.setVisibility(View.VISIBLE);
@@ -264,10 +278,15 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
         }
 
         printInProgress = true;
+        printJobDone = false;
+        printJobSucceeded = false;
+        printAnimationDone = false;
         primaryButton.setEnabled(false);
         primaryButton.setText(R.string.payment_success_printing);
+        returnButton.setEnabled(false);
+        layoutPrintedSuccess.setVisibility(View.GONE);
 
-        animateReceiptOut();
+        startReceiptPrintAnimation(receiptBitmap.getHeight());
         new Thread(() -> printReceiptBitmap(receiptBitmap)).start();
     }
 
@@ -298,25 +317,55 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
         return scaled;
     }
 
-    private void animateReceiptOut() {
-        cardReceipt.animate().cancel();
+    private void startReceiptPrintAnimation(int bitmapHeight) {
+        if (receiptAnimator != null) {
+            receiptAnimator.cancel();
+        }
+
+        printAnimationCancelled = false;
+        scrollReceipt.smoothScrollTo(0, 0);
+        cardReceipt.setVisibility(View.VISIBLE);
         cardReceipt.setAlpha(1f);
         cardReceipt.setTranslationY(0f);
 
         float distance = Math.max(cardReceipt.getHeight(), scrollReceipt.getHeight()) + 48f;
-        cardReceipt.animate()
-            .translationY(-distance)
-            .alpha(0f)
-            .setDuration(PRINT_ANIMATION_MS)
-            .setInterpolator(new AccelerateInterpolator())
-            .withEndAction(() -> cardReceipt.postDelayed(() -> {
-                cardReceipt.setTranslationY(0f);
+        receiptAnimator = ValueAnimator.ofFloat(0f, 1f);
+        receiptAnimator.setDuration(calculatePrintAnimationDurationMs(bitmapHeight));
+        receiptAnimator.setInterpolator(new LinearInterpolator());
+        receiptAnimator.addUpdateListener(animation -> {
+            float progress = (float) animation.getAnimatedValue();
+            cardReceipt.setTranslationY(-distance * progress);
+
+            float fadeStart = 0.9f;
+            if (progress <= fadeStart) {
                 cardReceipt.setAlpha(1f);
-            }, 300L))
-            .start();
+            } else {
+                cardReceipt.setAlpha(Math.max(0f, 1f - ((progress - fadeStart) / (1f - fadeStart))));
+            }
+        });
+        receiptAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                printAnimationCancelled = true;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (printAnimationCancelled) return;
+                printAnimationDone = true;
+                maybeFinishPrintFlow();
+            }
+        });
+        receiptAnimator.start();
+    }
+
+    private long calculatePrintAnimationDurationMs(int bitmapHeight) {
+        long heightBasedDuration = 1800L + Math.round(bitmapHeight * 5.5f);
+        return Math.max(MIN_PRINT_ANIMATION_MS, Math.min(MAX_PRINT_ANIMATION_MS, heightBasedDuration));
     }
 
     private void printReceiptBitmap(Bitmap receiptBmp) {
+        boolean printed = false;
         try {
             com.sunmi.pay.hardware.aidlv2.print.PrinterOptV2 printer = MyApplication.app.printerOptV2;
             if (printer == null) {
@@ -346,7 +395,7 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
                     printer.printPointLine(rowData);
                 }
                 printer.printFeedPaper(60);
-                showToast("Printed!");
+                printed = true;
             } finally {
                 printer.printClose();
             }
@@ -355,12 +404,66 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
             showToast("Print failed: " + e.getMessage());
         } finally {
             receiptBmp.recycle();
-            runOnUiThread(() -> {
-                printInProgress = false;
-                primaryButton.setEnabled(true);
-                primaryButton.setText(R.string.payment_success_print);
-            });
+            boolean success = printed;
+            runOnUiThread(() -> onPrintJobFinished(success));
         }
+    }
+
+    private void onPrintJobFinished(boolean success) {
+        printJobDone = true;
+        printJobSucceeded = success;
+        maybeFinishPrintFlow();
+    }
+
+    private void maybeFinishPrintFlow() {
+        if (!printInProgress || !printJobDone) return;
+
+        if (!printJobSucceeded) {
+            restoreReceiptAfterPrintFailure();
+            return;
+        }
+
+        if (printAnimationDone) {
+            showPrintedSuccessState();
+        }
+    }
+
+    private void restoreReceiptAfterPrintFailure() {
+        if (receiptAnimator != null) {
+            receiptAnimator.cancel();
+        }
+        printInProgress = false;
+        printJobDone = false;
+        printAnimationDone = false;
+        cardReceipt.setVisibility(View.VISIBLE);
+        cardReceipt.setTranslationY(0f);
+        cardReceipt.setAlpha(1f);
+        primaryButton.setEnabled(true);
+        primaryButton.setText(R.string.payment_success_print);
+        returnButton.setEnabled(true);
+    }
+
+    private void showPrintedSuccessState() {
+        printInProgress = false;
+        cardReceipt.setVisibility(View.GONE);
+        cardReceipt.setTranslationY(0f);
+        cardReceipt.setAlpha(1f);
+        layoutPrintedSuccess.setAlpha(0f);
+        layoutPrintedSuccess.setScaleX(0.96f);
+        layoutPrintedSuccess.setScaleY(0.96f);
+        layoutPrintedSuccess.setVisibility(View.VISIBLE);
+        layoutPrintedSuccess.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(220L)
+            .start();
+
+        primaryButton.setEnabled(false);
+        primaryButton.setText(R.string.payment_success_receipt_printed);
+        returnButton.setEnabled(true);
+        returnButton.setText(R.string.payment_success_return_qr_pay);
+        scrollReceipt.post(() -> scrollReceipt.smoothScrollTo(0, 0));
     }
 
     private boolean shouldPrintPixel(int pixel) {

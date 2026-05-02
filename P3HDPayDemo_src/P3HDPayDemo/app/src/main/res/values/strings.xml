@@ -33,7 +33,10 @@
     <string name="payment_success_loading_details">Loading Details...</string>
     <string name="payment_success_print">Print Receipt</string>
     <string name="payment_success_printing">Printing...</string>
+    <string name="payment_success_receipt_printed">Receipt printed</string>
+    <string name="payment_success_receipt_printed_message">The receipt has been sent to the printer.</string>
     <string name="payment_success_return">Return to QR</string>
+    <string name="payment_success_return_qr_pay">Return to QR Pay</string>
     <string name="payment_success_details_failed">Unable to load transaction details</string>
     <string name="payment_success_receipt_title">Transaction Receipt</string>
     <string name="payment_success_receipt_footer">Thank you!</string>
