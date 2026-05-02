@@ -3,14 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
+        style="@style/AppToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/primary"
         app:titleTextColor="@color/white" />
 
     <ScrollView
@@ -24,8 +24,8 @@
             android:id="@+id/layout_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
             android:gravity="center"
+            android:orientation="vertical"
             android:padding="@dimen/screen_margin">
 
             <LinearLayout
@@ -35,28 +35,31 @@
                 android:gravity="center"
                 android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="&#x2713;"
-                    android:textSize="72sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/success" />
+                <FrameLayout
+                    android:layout_width="104dp"
+                    android:layout_height="104dp"
+                    android:background="@drawable/bg_soft_success_circle">
+
+                    <ImageView
+                        android:layout_width="54dp"
+                        android:layout_height="54dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_check" />
+                </FrameLayout>
 
                 <TextView
+                    style="@style/TextScreenTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/payment_success_heading"
-                    android:textSize="28sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_primary"
-                    android:layout_marginTop="8dp" />
+                    android:layout_marginTop="18dp"
+                    android:text="@string/payment_success_heading" />
 
                 <com.google.android.material.card.MaterialCardView
                     style="@style/AppCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp">
+                    android:layout_marginTop="22dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -68,25 +71,25 @@
                             android:id="@+id/tv_amount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textSize="24sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/text_primary" />
+                            android:textColor="@color/text_primary"
+                            android:textSize="26sp"
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tv_ref"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textSize="16sp"
+                            android:layout_marginTop="8dp"
                             android:textColor="@color/text_secondary"
-                            android:layout_marginTop="8dp" />
+                            android:textSize="15sp" />
 
                         <TextView
                             android:id="@+id/tv_date_time"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textSize="16sp"
+                            android:layout_marginTop="4dp"
                             android:textColor="@color/text_secondary"
-                            android:layout_marginTop="4dp" />
+                            android:textSize="15sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
@@ -96,6 +99,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="28dp"
+                android:indeterminateTint="@color/accent"
                 android:visibility="gone" />
 
             <com.google.android.material.card.MaterialCardView
@@ -139,7 +143,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:gravity="center"
-                        android:textColor="@color/text_secondary"
+                        android:textColor="@color/success"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -152,9 +156,11 @@
                     <LinearLayout
                         android:id="@+id/row_transaction_id"
                         style="@style/ReceiptDetailRow">
+
                         <TextView
                             style="@style/ReceiptDetailLabel"
                             android:text="@string/payment_success_transaction_id" />
+
                         <TextView
                             android:id="@+id/tv_receipt_transaction_id"
                             style="@style/ReceiptDetailValue" />
@@ -163,9 +169,11 @@
                     <LinearLayout
                         android:id="@+id/row_request_id"
                         style="@style/ReceiptDetailRow">
+
                         <TextView
                             style="@style/ReceiptDetailLabel"
                             android:text="@string/payment_success_request_id" />
+
                         <TextView
                             android:id="@+id/tv_receipt_request_id"
                             style="@style/ReceiptDetailValue" />
@@ -174,9 +182,11 @@
                     <LinearLayout
                         android:id="@+id/row_date"
                         style="@style/ReceiptDetailRow">
+
                         <TextView
                             style="@style/ReceiptDetailLabel"
                             android:text="@string/payment_success_date" />
+
                         <TextView
                             android:id="@+id/tv_receipt_date"
                             style="@style/ReceiptDetailValue" />
@@ -185,9 +195,11 @@
                     <LinearLayout
                         android:id="@+id/row_currency"
                         style="@style/ReceiptDetailRow">
+
                         <TextView
                             style="@style/ReceiptDetailLabel"
                             android:text="@string/payment_success_currency" />
+
                         <TextView
                             android:id="@+id/tv_receipt_currency"
                             style="@style/ReceiptDetailValue" />
@@ -196,9 +208,11 @@
                     <LinearLayout
                         android:id="@+id/row_payer"
                         style="@style/ReceiptDetailRow">
+
                         <TextView
                             style="@style/ReceiptDetailLabel"
                             android:text="@string/payment_success_payer" />
+
                         <TextView
                             android:id="@+id/tv_receipt_payer"
                             style="@style/ReceiptDetailValue" />
@@ -207,9 +221,11 @@
                     <LinearLayout
                         android:id="@+id/row_terminal"
                         style="@style/ReceiptDetailRow">
+
                         <TextView
                             style="@style/ReceiptDetailLabel"
                             android:text="@string/payment_success_terminal" />
+
                         <TextView
                             android:id="@+id/tv_receipt_terminal"
                             style="@style/ReceiptDetailValue" />
@@ -218,9 +234,11 @@
                     <LinearLayout
                         android:id="@+id/row_merchant"
                         style="@style/ReceiptDetailRow">
+
                         <TextView
                             style="@style/ReceiptDetailLabel"
                             android:text="@string/payment_success_merchant" />
+
                         <TextView
                             android:id="@+id/tv_receipt_merchant"
                             style="@style/ReceiptDetailValue" />
@@ -253,33 +271,33 @@
                 android:paddingBottom="48dp"
                 android:visibility="gone">
 
-                <TextView
-                    android:layout_width="96dp"
-                    android:layout_height="96dp"
-                    android:background="@drawable/bg_success_circle"
-                    android:gravity="center"
-                    android:text="&#x2713;"
-                    android:textColor="@color/white"
-                    android:textSize="54sp"
-                    android:textStyle="bold" />
+                <FrameLayout
+                    android:layout_width="104dp"
+                    android:layout_height="104dp"
+                    android:background="@drawable/bg_soft_success_circle">
+
+                    <ImageView
+                        android:layout_width="54dp"
+                        android:layout_height="54dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_check" />
+                </FrameLayout>
 
                 <TextView
+                    style="@style/TextScreenTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
-                    android:text="@string/payment_success_receipt_printed"
-                    android:textColor="@color/text_primary"
-                    android:textSize="26sp"
-                    android:textStyle="bold" />
+                    android:text="@string/payment_success_receipt_printed" />
 
                 <TextView
+                    style="@style/TextBodyMuted"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:gravity="center"
-                    android:text="@string/payment_success_receipt_printed_message"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="16sp" />
+                    android:text="@string/payment_success_receipt_printed_message" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
@@ -295,8 +313,8 @@
             style="@style/AccentButton"
             android:layout_width="0dp"
             android:layout_height="@dimen/button_height"
-            android:layout_weight="1"
             android:layout_marginEnd="8dp"
+            android:layout_weight="1"
             android:text="@string/payment_success_view_details" />
 
         <com.google.android.material.button.MaterialButton
@@ -304,8 +322,8 @@
             style="@style/SecondaryButton"
             android:layout_width="0dp"
             android:layout_height="@dimen/button_height"
-            android:layout_weight="1"
             android:layout_marginStart="8dp"
+            android:layout_weight="1"
             android:text="@string/payment_success_return" />
     </LinearLayout>
 </LinearLayout>

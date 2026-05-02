@@ -3,49 +3,53 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
+        style="@style/AppToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/primary"
         app:titleTextColor="@color/white" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
         android:gravity="center"
+        android:orientation="vertical"
         android:padding="@dimen/screen_margin">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="&#x23F3;"
-            android:textSize="72sp"
-            android:textColor="@color/warning" />
+        <FrameLayout
+            android:layout_width="104dp"
+            android:layout_height="104dp"
+            android:background="@drawable/bg_soft_warning_circle">
+
+            <ImageView
+                android:layout_width="58dp"
+                android:layout_height="58dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_clock" />
+        </FrameLayout>
 
         <TextView
+            style="@style/TextScreenTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/qr_expired_heading"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary"
-            android:layout_marginTop="16dp" />
+            android:layout_marginTop="20dp"
+            android:text="@string/qr_expired_heading" />
 
         <TextView
+            style="@style/TextBodyMuted"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/qr_expired_message"
-            android:textSize="16sp"
-            android:textColor="@color/text_secondary"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="32dp"
             android:gravity="center"
-            android:lineSpacingMultiplier="1.4"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="32dp" />
+            android:lineSpacingMultiplier="1.35"
+            android:text="@string/qr_expired_message"
+            android:textSize="16sp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_return"

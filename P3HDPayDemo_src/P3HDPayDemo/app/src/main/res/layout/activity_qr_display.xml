@@ -3,87 +3,99 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
+        style="@style/AppToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/primary"
         app:titleTextColor="@color/white" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:background="@color/background">
+        android:background="@color/background"
+        android:orientation="vertical">
 
-        <!-- Timer row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/bg_amount_panel"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="12dp"
-            android:gravity="end"
-            android:background="@color/primary">
+            android:paddingStart="20dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="18dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/TextSectionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/qr_display_waiting"
+                    android:textColor="#B8FFFFFF" />
+
+                <TextView
+                    android:id="@+id/tv_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="AED 0.00"
+                    android:textColor="@color/white"
+                    android:textSize="30sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/tv_timer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:background="@drawable/bg_timer_chip"
                 android:text="05:00"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/white" />
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <View android:layout_width="match_parent" android:layout_height="1dp"
-            android:background="@color/divider" />
-
-        <!-- Content -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:orientation="vertical"
             android:gravity="center"
+            android:orientation="vertical"
             android:padding="@dimen/screen_margin">
 
-            <TextView
-                android:id="@+id/tv_amount"
+            <com.google.android.material.card.MaterialCardView
+                style="@style/AppCard"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="AED 0.00"
-                android:textSize="32sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:layout_marginBottom="16dp" />
+                app:cardElevation="6dp"
+                app:strokeWidth="0dp">
 
-            <com.google.android.material.card.MaterialCardView
-                app:cardCornerRadius="8dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/white"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content">
                 <ImageView
                     android:id="@+id/iv_qr_code"
                     android:layout_width="280dp"
                     android:layout_height="280dp"
-                    android:padding="8dp"
+                    android:padding="14dp"
                     android:scaleType="fitCenter" />
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
-                android:layout_width="wrap_content"
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/qr_pay_scan_instruction"
-                android:textSize="15sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginTop="16dp" />
+                android:layout_marginTop="18dp"
+                android:gravity="center"
+                android:text="@string/qr_pay_scan_instruction" />
         </LinearLayout>
-
-        <View android:layout_width="match_parent" android:layout_height="1dp"
-            android:background="@color/divider" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_cancel"

@@ -3,19 +3,20 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
+        style="@style/AppToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/primary"
         app:titleTextColor="@color/white" />
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -23,152 +24,233 @@
             android:orientation="vertical"
             android:padding="@dimen/screen_margin">
 
-            <!-- Type selection card -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/AppCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp">
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:padding="16dp">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="Card Type" android:textColor="@color/text_secondary"
-                        android:textSize="12sp" android:layout_marginBottom="8dp" />
-                    <RadioGroup android:id="@+id/rdg_nfc_type"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
+
+                    <TextView
+                        style="@style/TextSectionLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/hce_card_type_label" />
+
+                    <RadioGroup
+                        android:id="@+id/rdg_nfc_type"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
                         android:orientation="horizontal">
-                        <RadioButton android:id="@+id/rdo_type2" android:text="@string/hce_type2"
+
+                        <RadioButton
+                            android:id="@+id/rdo_type2"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:buttonTint="@color/accent"
+                            android:text="@string/hce_type2"
                             android:textColor="@color/text_primary"
-                            android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:buttonTint="@color/accent" />
-                        <RadioButton android:id="@+id/rdo_type4" android:text="@string/hce_type4"
+                            android:textStyle="bold" />
+
+                        <RadioButton
+                            android:id="@+id/rdo_type4"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:buttonTint="@color/accent"
+                            android:text="@string/hce_type4"
                             android:textColor="@color/text_primary"
-                            android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:buttonTint="@color/accent" />
+                            android:textStyle="bold" />
                     </RadioGroup>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Data preset card -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/AppCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp">
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:padding="16dp">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="@string/hce_data_label" android:textColor="@color/text_secondary"
-                        android:textSize="12sp" android:layout_marginBottom="8dp" />
-                    <RadioGroup android:id="@+id/rdg_nfc_data"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
+
+                    <TextView
+                        style="@style/TextSectionLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/hce_data_label" />
+
+                    <RadioGroup
+                        android:id="@+id/rdg_nfc_data"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
                         android:orientation="horizontal">
-                        <RadioButton android:id="@+id/rdo_data_1" android:text="1"
+
+                        <RadioButton
+                            android:id="@+id/rdo_data_1"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:buttonTint="@color/accent"
+                            android:text="1"
                             android:textColor="@color/text_primary"
-                            android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:buttonTint="@color/accent" />
-                        <RadioButton android:id="@+id/rdo_data_2" android:text="2"
+                            android:textStyle="bold" />
+
+                        <RadioButton
+                            android:id="@+id/rdo_data_2"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:buttonTint="@color/accent"
+                            android:text="2"
                             android:textColor="@color/text_primary"
-                            android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:buttonTint="@color/accent" />
-                        <RadioButton android:id="@+id/rdo_data_3" android:text="3"
+                            android:textStyle="bold" />
+
+                        <RadioButton
+                            android:id="@+id/rdo_data_3"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:buttonTint="@color/accent"
+                            android:text="3"
                             android:textColor="@color/text_primary"
-                            android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:buttonTint="@color/accent" />
-                        <RadioButton android:id="@+id/rdo_data_4" android:text="4"
+                            android:textStyle="bold" />
+
+                        <RadioButton
+                            android:id="@+id/rdo_data_4"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:buttonTint="@color/accent"
+                            android:text="4"
                             android:textColor="@color/text_primary"
-                            android:layout_width="0dp" android:layout_height="wrap_content"
-                            android:layout_weight="1" android:buttonTint="@color/accent" />
+                            android:textStyle="bold" />
                     </RadioGroup>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- NDEF data input -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/AppCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp">
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:padding="16dp">
+
+                    <TextView
+                        style="@style/TextSectionLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/hce_ndef_hint" />
+
                     <EditText
                         android:id="@+id/edt_ndef_text"
+                        style="@style/InputField"
                         android:layout_width="match_parent"
-                        android:layout_height="120dp"
-                        android:hint="@string/hce_ndef_hint"
-                        android:textColor="@color/text_primary"
-                        android:textColorHint="@color/text_secondary"
-                        android:background="@null"
-                        android:maxLength="1014"
+                        android:layout_height="132dp"
+                        android:layout_marginTop="10dp"
                         android:gravity="top|start"
-                        android:inputType="textMultiLine" />
+                        android:hint="@string/hce_ndef_hint"
+                        android:inputType="textMultiLine"
+                        android:maxLength="1014" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Action buttons -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="8dp"
+                android:orientation="horizontal">
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_open_hce"
                     style="@style/AccentButton"
-                    android:layout_width="0dp" android:layout_height="wrap_content"
-                    android:layout_weight="1" android:layout_marginEnd="4dp"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
                     android:text="@string/hce_open" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_close_hce"
                     style="@style/SecondaryButton"
-                    android:layout_width="0dp" android:layout_height="wrap_content"
-                    android:layout_weight="1" android:layout_marginStart="4dp"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
                     android:text="@string/hce_close" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="12dp"
+                android:orientation="horizontal">
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_write_ndef_data"
                     style="@style/AccentButton"
-                    android:layout_width="0dp" android:layout_height="wrap_content"
-                    android:layout_weight="1" android:layout_marginEnd="4dp"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
                     android:text="@string/hce_write" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_read_ndef_data"
                     style="@style/SecondaryButton"
-                    android:layout_width="0dp" android:layout_height="wrap_content"
-                    android:layout_weight="1" android:layout_marginStart="4dp"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
                     android:text="@string/hce_read" />
             </LinearLayout>
 
-            <!-- Info output -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/AppCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
-                <TextView
-                    android:id="@+id/tv_info"
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minHeight="80dp"
-                    android:padding="16dp"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:text="Output will appear here" />
-            </com.google.android.material.card.MaterialCardView>
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
+                    <TextView
+                        style="@style/TextSectionLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/hce_output_label" />
+
+                    <TextView
+                        android:id="@+id/tv_info"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_input_field"
+                        android:minHeight="88dp"
+                        android:padding="14dp"
+                        android:text="Output will appear here"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </ScrollView>
 </LinearLayout>
