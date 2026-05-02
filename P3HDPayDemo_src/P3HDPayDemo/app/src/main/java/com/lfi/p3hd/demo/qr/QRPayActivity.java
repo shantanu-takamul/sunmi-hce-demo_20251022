@@ -44,7 +44,8 @@ public class QRPayActivity extends BaseAppCompatActivity {
     }
 
     private void initView() {
-        initActionbar(R.string.qr_pay);
+        boolean nfcMode = "nfc".equals(getIntent().getStringExtra("mode"));
+        initActionbar(nfcMode ? R.string.nfc_pay_title : R.string.qr_pay);
         layoutInput = findViewById(R.id.layout_input);
         layoutLoading = findViewById(R.id.layout_loading);
         tvAmountInput = findViewById(R.id.tv_amount_input);
@@ -61,8 +62,16 @@ public class QRPayActivity extends BaseAppCompatActivity {
         }
         findViewById(R.id.btn_dot).setOnClickListener(v -> appendDot());
         findViewById(R.id.btn_backspace).setOnClickListener(v -> backspace());
-        findViewById(R.id.btn_generate).setOnClickListener(v -> onGenerateClicked());
-        findViewById(R.id.btn_nfc_pay).setOnClickListener(v -> onNfcPayClicked());
+
+        View btnGenerate = findViewById(R.id.btn_generate);
+        View btnNfcPay = findViewById(R.id.btn_nfc_pay);
+        if (nfcMode) {
+            btnGenerate.setVisibility(View.GONE);
+            btnNfcPay.setOnClickListener(v -> onNfcPayClicked());
+        } else {
+            btnNfcPay.setVisibility(View.GONE);
+            btnGenerate.setOnClickListener(v -> onGenerateClicked());
+        }
     }
 
     @Override

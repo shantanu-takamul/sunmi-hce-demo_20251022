@@ -31,7 +31,7 @@ public class HCEReceiptActivity extends BaseAppCompatActivity {
     private void initView() {
         initActionbar(R.string.hce_receipt_title);
         edtUrl = findViewById(R.id.edt_url);
-        edtUrl.setText("https://pay.lfi.ae/receipt/sample");
+        edtUrl.setText("ddwallet://nfc?walletId=ADCB148E6BDC2C&merchantName=SHANS+SHOP&walletType=MICRO_MERCHANT");
         findViewById(R.id.btn_enable_nfc).setOnClickListener(v -> enableNfcTap());
         findViewById(R.id.btn_close_hce).setOnClickListener(v -> closeHce(true));
     }
@@ -47,7 +47,7 @@ public class HCEReceiptActivity extends BaseAppCompatActivity {
             showToast("Receipt URL shouldn't be empty");
             return;
         }
-        if (!isHttpUrl(urlStr)) {
+        if (!isHttpUrl(urlStr) && !urlStr.startsWith("ddwallet://")) {
             showToast("Invalid URL");
             return;
         }

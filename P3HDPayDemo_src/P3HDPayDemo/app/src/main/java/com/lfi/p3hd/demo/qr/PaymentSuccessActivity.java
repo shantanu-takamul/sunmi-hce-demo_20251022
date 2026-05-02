@@ -15,28 +15,34 @@ import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.MyApplication;
 import com.lfi.p3hd.demo.R;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
 public class PaymentSuccessActivity extends BaseAppCompatActivity {
     public static final String EXTRA_AMOUNT_AED  = "amountAed";
     public static final String EXTRA_REQUEST_ID  = "requestId";
-    public static final String EXTRA_EMV_PAYLOAD = "emvPayload";
+    public static final String EXTRA_EMV_PAYLOAD = "emvPayload";  // kept for caller compatibility
 
     private String amountAed;
     private String requestId;
-    private String emvPayload;
     private String dateTimeStr;
+    private final OkHttpClient httpClient = new OkHttpClient();
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_payment_success);
 
-        amountAed  = getIntent().getStringExtra(EXTRA_AMOUNT_AED);
-        requestId  = getIntent().getStringExtra(EXTRA_REQUEST_ID);
-        emvPayload = getIntent().getStringExtra(EXTRA_EMV_PAYLOAD);
+        amountAed   = getIntent().getStringExtra(EXTRA_AMOUNT_AED);
+        requestId   = getIntent().getStringExtra(EXTRA_REQUEST_ID);
         dateTimeStr = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date());
 
         initView();
@@ -54,62 +60,79 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
     }
 
     private void printReceipt() {
+        // Step 1: fetch full transaction details
+        JSONObject tx = null;
+        try {
+            String url = QRConfig.getBaseUrl() + QRConfig.QR_STATUS_ENDPOINT + "?requestId=" + requestId;
+            Request req = new Request.Builder()
+                .url(url)
+                .addHeader("X-LFI-ID", QRConfig.X_LFI_ID)
+                .get()
+                .build();
+            Response response = httpClient.newCall(req).execute();
+            String body = response.body().string();
+            Log.d(TAG, "fetchTx: " + body);
+            JSONObject json = new JSONObject(body);
+            JSONArray transactions = json.optJSONArray("transactions");
+            if (transactions != null && transactions.length() > 0) {
+                tx = transactions.getJSONObject(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "fetchTx failed, printing with available data", e);
+        }
+
+        // Step 2: print
         try {
             com.sunmi.pay.hardware.aidlv2.print.PrinterOptV2 printer = MyApplication.app.printerOptV2;
             if (printer == null) {
                 showToast("Printer not connected");
                 return;
             }
-            int status = printer.getPrinterStatus();
-            if (status < 0) {
-                showToast("Printer error: " + status);
+
+            // Must open BEFORE any printer call — getPrinterStatus() returns -1707 if called without open
+            int openCode = printer.printOpen();
+            if (openCode < 0) {
+                showToast("Printer error: " + openCode);
                 return;
             }
 
-            // Printer paper width: 384 dots (58mm at 8dpi)
-            final int PAPER_WIDTH = 384;
-
-            // Build receipt as a bitmap, then print row by row
-            Bitmap receiptBmp = buildReceiptBitmap(PAPER_WIDTH);
-            if (receiptBmp == null) {
-                showToast("Failed to render receipt");
-                return;
-            }
-
-            printer.printOpen();
-
-            int rows = receiptBmp.getHeight();
-            byte[] rowData = new byte[PAPER_WIDTH / 8];
-            for (int y = 0; y < rows; y++) {
-                for (int byteIdx = 0; byteIdx < rowData.length; byteIdx++) {
-                    byte b = 0;
-                    for (int bit = 0; bit < 8; bit++) {
-                        int x = byteIdx * 8 + bit;
-                        int pixel = receiptBmp.getPixel(x, y);
-                        // Black pixel = print dot (bit = 1), white = no dot
-                        if (Color.red(pixel) < 128) {
-                            b |= (byte) (0x80 >> bit);
-                        }
-                    }
-                    rowData[byteIdx] = b;
+            try {
+                final int PAPER_WIDTH = 384;
+                Bitmap receiptBmp = buildReceiptBitmap(PAPER_WIDTH, tx);
+                if (receiptBmp == null) {
+                    showToast("Failed to render receipt");
+                    return;
                 }
-                printer.printPointLine(rowData);
+
+                int rows = receiptBmp.getHeight();
+                byte[] rowData = new byte[PAPER_WIDTH / 8];
+                for (int y = 0; y < rows; y++) {
+                    for (int byteIdx = 0; byteIdx < rowData.length; byteIdx++) {
+                        byte b = 0;
+                        for (int bit = 0; bit < 8; bit++) {
+                            int x = byteIdx * 8 + bit;
+                            int pixel = receiptBmp.getPixel(x, y);
+                            if (Color.red(pixel) < 128) {
+                                b |= (byte) (0x80 >> bit);
+                            }
+                        }
+                        rowData[byteIdx] = b;
+                    }
+                    printer.printPointLine(rowData);
+                }
+                printer.printFeedPaper(60);
+                showToast("Printed!");
+            } finally {
+                printer.printClose();
             }
-
-            // Feed paper at end
-            printer.printFeedPaper(60);
-            printer.printClose();
-
-            showToast("Printed!");
         } catch (Exception e) {
             Log.e(TAG, "printReceipt error", e);
             showToast("Print failed: " + e.getMessage());
         }
     }
 
-    private Bitmap buildReceiptBitmap(int width) {
-        // Estimate height (will be trimmed)
-        int estimatedHeight = 800;
+    private Bitmap buildReceiptBitmap(int width, JSONObject tx) {
+        int estimatedHeight = 600;
         Bitmap bmp = Bitmap.createBitmap(width, estimatedHeight, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bmp);
         canvas.drawColor(Color.WHITE);
@@ -118,7 +141,7 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
         paint.setColor(Color.BLACK);
         int y = 20;
 
-        // Header — center, bold large
+        // Header — bold, centered
         paint.setTextSize(32);
         paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
         paint.setTextAlign(Paint.Align.CENTER);
@@ -133,28 +156,79 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
         canvas.drawLine(10, y, width - 10, y, paint);
         y += 20;
 
-        // Fields — left aligned, normal
+        // Fields — normal, left-aligned
         paint.setTypeface(Typeface.DEFAULT);
         paint.setTextSize(24);
         paint.setTextAlign(Paint.Align.LEFT);
-        canvas.drawText("Amount:  AED " + amountAed, 16, y, paint); y += 36;
-        canvas.drawText("Ref:     " + requestId, 16, y, paint); y += 36;
-        canvas.drawText("Date:    " + dateTimeStr, 16, y, paint); y += 36;
-        canvas.drawText("Status:  PAID", 16, y, paint); y += 36;
+
+        // Amount — prefer API fils value converted to AED, fallback to passed string
+        String displayAmount = amountAed;
+        if (tx != null && tx.has("amount")) {
+            try {
+                long fils = tx.getLong("amount");
+                displayAmount = String.format(Locale.US, "%.2f", fils / 100.0);
+            } catch (Exception ignored) {}
+        }
+        canvas.drawText("Amount:  AED " + displayAmount, 16, y, paint); y += 36;
+
+        // Currency
+        if (tx != null) {
+            String currency = tx.optString("currency", "");
+            if (!currency.isEmpty()) {
+                canvas.drawText("Currency: " + currency, 16, y, paint); y += 36;
+            }
+        }
+
+        // Ref / Transaction ID
+        String displayRef = requestId != null && requestId.length() >= 8
+            ? requestId.substring(requestId.length() - 8) : requestId;
+        if (tx != null) {
+            String apiId = tx.optString("transactionId", tx.optString("id", ""));
+            if (!apiId.isEmpty()) displayRef = apiId;
+        }
+        canvas.drawText("Ref:     " + displayRef, 16, y, paint); y += 36;
+
+        // Date — prefer API timestamp, fallback to local
+        String displayDate = dateTimeStr;
+        if (tx != null) {
+            String apiDate = tx.optString("createdAt",
+                             tx.optString("updatedAt",
+                             tx.optString("transactionDate", "")));
+            if (!apiDate.isEmpty()) {
+                displayDate = apiDate.length() > 16
+                    ? apiDate.substring(0, 16).replace("T", " ")
+                    : apiDate;
+            }
+        }
+        canvas.drawText("Date:    " + displayDate, 16, y, paint); y += 36;
+
+        // Status
+        String displayStatus = "PAID";
+        if (tx != null) {
+            String apiStatus = tx.optString("transactionStatus", "");
+            if (!apiStatus.isEmpty()) displayStatus = apiStatus;
+        }
+        canvas.drawText("Status:  " + displayStatus, 16, y, paint); y += 36;
+
+        // Payer wallet — only if present in API response
+        if (tx != null) {
+            String payer = tx.optString("senderWalletId",
+                           tx.optString("payerWalletId", ""));
+            if (!payer.isEmpty()) {
+                canvas.drawText("Payer:   " + payer, 16, y, paint); y += 36;
+            }
+        }
 
         // Divider
         canvas.drawLine(10, y, width - 10, y, paint);
         y += 20;
 
-        // QR code centered
-        Bitmap qrBmp = QRDisplayActivity.buildQRBitmap(emvPayload, 200, 200);
-        if (qrBmp != null) {
-            int qrX = (width - 200) / 2;
-            canvas.drawBitmap(qrBmp, qrX, y, null);
-            y += 220;
-        }
+        // Footer
+        paint.setTextSize(20);
+        paint.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText("Thank you!", width / 2f, y, paint);
+        y += 28;
 
-        // Trim to actual content height
         return Bitmap.createBitmap(bmp, 0, 0, width, Math.min(y + 20, estimatedHeight));
     }
 }

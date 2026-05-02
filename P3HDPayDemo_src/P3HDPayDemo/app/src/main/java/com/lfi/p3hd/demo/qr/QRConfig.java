@@ -5,7 +5,7 @@ import com.lfi.p3hd.demo.utils.PreferencesUtil;
 public class QRConfig {
     public static final String X_LFI_ID               = "lfi-ADCB";
     public static final String QR_TYPE                 = "DYNAMIC";
-    public static final String WALLET_ID               = "ADCBCA87DA2BF8";
+    public static final String WALLET_ID               = "ADCB1920276ECD";
     public static final String CURRENCY                = "AED";
     public static final String TERMINAL_ID             = "TERM001";
     public static final String TRADING_LICENSE_NUMBER  = "TL-123456789";
