@@ -1,33 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Brand blue — used for toolbars, primary actions -->
-    <color name="primary">#1565C0</color>
-    <color name="primary_dark">#003c8f</color>
-    <color name="accent">#1565C0</color>
+    <!-- Brand shell -->
+    <color name="primary">#102A43</color>
+    <color name="primary_dark">#071923</color>
+    <color name="primary_variant">#155E75</color>
+    <color name="accent">#0F766E</color>
+    <color name="accent_dark">#0B5E59</color>
+    <color name="accent_soft">#DDF7F1</color>
 
     <!-- Page / layout backgrounds -->
-    <color name="background">#F4F6F9</color>
+    <color name="background">#F5F7FA</color>
     <color name="surface">#FFFFFF</color>
     <color name="card">#FFFFFF</color>
+    <color name="surface_subtle">#EDF2F7</color>
+    <color name="surface_pressed">#E2E8F0</color>
+    <color name="card_stroke">#DCE5EE</color>
 
     <!-- Semantic -->
-    <color name="success">#2E7D32</color>
-    <color name="warning">#E65100</color>
-    <color name="error">#C62828</color>
+    <color name="success">#15803D</color>
+    <color name="success_soft">#DCFCE7</color>
+    <color name="warning">#B45309</color>
+    <color name="warning_soft">#FEF3C7</color>
+    <color name="error">#B42318</color>
+    <color name="error_soft">#FEE4E2</color>
 
     <!-- Text -->
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
-    <color name="text_dark">#212121</color>
+    <color name="text_primary">#111827</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_tertiary">#94A3B8</color>
+    <color name="text_dark">#111827</color>
     <color name="white">#FFFFFF</color>
 
     <!-- Dividers / borders -->
-    <color name="divider">#E0E0E0</color>
+    <color name="divider">#E5EAF0</color>
 
     <!-- Numpad -->
     <color name="numpad_bg">#FFFFFF</color>
-    <color name="numpad_text">#212121</color>
+    <color name="numpad_text">#111827</color>
+    <color name="numpad_action_bg">#FFF7ED</color>
+    <color name="numpad_stroke">#D9E2EC</color>
 
     <!-- Secondary / cancel buttons -->
-    <color name="btn_secondary">#607D8B</color>
+    <color name="btn_secondary">#334155</color>
 </resources>

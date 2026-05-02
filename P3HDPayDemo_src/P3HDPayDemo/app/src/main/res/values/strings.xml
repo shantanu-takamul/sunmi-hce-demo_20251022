@@ -4,15 +4,26 @@
 
     <!-- Main -->
     <string name="main_title">P3HD Pay Demo</string>
+    <string name="main_header_label">Payment terminal</string>
+    <string name="main_header_title">Accept payments faster</string>
+    <string name="main_header_subtitle">QR, NFC, HCE, and card reader tools in one operator console.</string>
     <string name="card_qr_payment">QR Payment</string>
+    <string name="card_qr_payment_desc">Create a scannable customer payment code</string>
     <string name="card_nfc_payment">NFC Payment</string>
+    <string name="card_nfc_payment_desc">Start a contactless phone tap payment</string>
     <string name="card_hce_emulate">HCE Emulate</string>
+    <string name="card_hce_emulate_desc">Write and test hosted card data</string>
     <string name="card_hce_receipt">HCE Receipt</string>
+    <string name="card_hce_receipt_desc">Prepare a tap receipt handoff</string>
     <string name="card_nfc_read">NFC Read Card</string>
+    <string name="card_nfc_read_desc">Scan and inspect NFC payloads</string>
     <string name="card_settings">Settings</string>
+    <string name="card_settings_desc">Environment, key, and wallet setup</string>
 
     <!-- QR Pay -->
     <string name="qr_pay">QR Pay</string>
+    <string name="qr_pay_amount_label">Sale amount</string>
+    <string name="qr_pay_amount_subtitle">Enter the amount before presenting a QR or NFC payment method.</string>
     <string name="qr_pay_amount_hint">AED</string>
     <string name="qr_pay_amount_error">Please enter a valid amount greater than 0</string>
     <string name="qr_pay_error_network">Network error</string>
@@ -24,6 +35,7 @@
 
     <!-- QR Display -->
     <string name="qr_display_title">QR Payment</string>
+    <string name="qr_display_waiting">Awaiting customer payment</string>
     <string name="qr_cancel">Cancel</string>
 
     <!-- Success -->
@@ -66,6 +78,8 @@
 
     <!-- HCE -->
     <string name="hce_title">HCE Emulate</string>
+    <string name="hce_card_type_label">Card type</string>
+    <string name="hce_output_label">Output</string>
     <string name="hce_open">Open HCE</string>
     <string name="hce_write">Write NDEF</string>
     <string name="hce_read">Read NDEF</string>
@@ -77,12 +91,15 @@
 
     <!-- HCE Receipt -->
     <string name="hce_receipt_title">HCE Receipt</string>
+    <string name="hce_receipt_url_label">Receipt URL</string>
     <string name="hce_receipt_url_hint">https://pay.lfi.ae/receipt/&#8230;</string>
     <string name="hce_enable_nfc">Enable NFC Tap</string>
     <string name="hce_close_btn">Close</string>
 
     <!-- NFC Read -->
     <string name="nfc_read_title">NFC Read Card</string>
+    <string name="nfc_read_header_label">NFC reader</string>
+    <string name="nfc_read_header_title">Present NFC card to device</string>
     <string name="nfc_read_start">Start Scan</string>
     <string name="nfc_read_stop">Stop</string>
     <string name="nfc_read_waiting">Waiting for NFC card\u2026</string>
@@ -90,6 +107,8 @@
 
     <!-- Settings -->
     <string name="setting_title">Settings</string>
+    <string name="setting_header_label">Terminal configuration</string>
+    <string name="setting_header_title">Payment environment</string>
     <string name="setting_env_label">LFI Environment</string>
     <string name="setting_env_title">Select Environment</string>
     <string name="setting_change">Change</string>
