@@ -29,8 +29,21 @@
     <!-- Success -->
     <string name="payment_success_title">Payment Successful</string>
     <string name="payment_success_heading">Payment Successful!</string>
+    <string name="payment_success_view_details">View Details</string>
+    <string name="payment_success_loading_details">Loading Details...</string>
     <string name="payment_success_print">Print Receipt</string>
+    <string name="payment_success_printing">Printing...</string>
     <string name="payment_success_return">Return to QR</string>
+    <string name="payment_success_details_failed">Unable to load transaction details</string>
+    <string name="payment_success_receipt_title">Transaction Receipt</string>
+    <string name="payment_success_receipt_footer">Thank you!</string>
+    <string name="payment_success_transaction_id">Transaction ID</string>
+    <string name="payment_success_request_id">Request ID</string>
+    <string name="payment_success_date">Date</string>
+    <string name="payment_success_currency">Currency</string>
+    <string name="payment_success_payer">Payer</string>
+    <string name="payment_success_terminal">Terminal</string>
+    <string name="payment_success_merchant">Merchant</string>
 
     <!-- Expired -->
     <string name="qr_expired_title">QR Expired</string>

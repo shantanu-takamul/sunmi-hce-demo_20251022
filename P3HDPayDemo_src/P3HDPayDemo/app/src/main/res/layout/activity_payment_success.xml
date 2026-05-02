@@ -17,66 +17,229 @@
         android:id="@+id/scroll_receipt"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:fillViewport="true">
 
         <LinearLayout
+            android:id="@+id/layout_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center"
             android:padding="@dimen/screen_margin">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:id="@+id/layout_success_summary"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="&#x2713;"
-                android:textSize="72sp"
-                android:textStyle="bold"
-                android:textColor="@color/success" />
+                android:gravity="center"
+                android:orientation="vertical">
 
-            <TextView
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="&#x2713;"
+                    android:textSize="72sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/success" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/payment_success_heading"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="8dp" />
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/AppCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="20dp">
+
+                        <TextView
+                            android:id="@+id/tv_amount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="24sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+
+                        <TextView
+                            android:id="@+id/tv_ref"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="16sp"
+                            android:textColor="@color/text_secondary"
+                            android:layout_marginTop="8dp" />
+
+                        <TextView
+                            android:id="@+id/tv_date_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="16sp"
+                            android:textColor="@color/text_secondary"
+                            android:layout_marginTop="4dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/progress_details"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/payment_success_heading"
-                android:textSize="28sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:layout_marginTop="8dp" />
+                android:layout_marginTop="28dp"
+                android:visibility="gone" />
 
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_receipt"
                 style="@style/AppCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp">
+                android:visibility="gone"
+                app:cardElevation="2dp">
+
                 <LinearLayout
+                    android:id="@+id/layout_receipt_content"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="@color/white"
                     android:orientation="vertical"
                     android:padding="20dp">
 
                     <TextView
-                        android:id="@+id/tv_amount"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="24sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
+                        android:gravity="center"
+                        android:text="@string/payment_success_receipt_title"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/tv_ref"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/tv_receipt_amount"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_secondary"
-                        android:layout_marginTop="8dp" />
+                        android:layout_marginTop="16dp"
+                        android:gravity="center"
+                        android:textColor="@color/text_primary"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/tv_date_time"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/tv_receipt_status"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="16sp"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
                         android:textColor="@color/text_secondary"
-                        android:layout_marginTop="4dp" />
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="18dp"
+                        android:background="@color/divider" />
+
+                    <LinearLayout
+                        android:id="@+id/row_transaction_id"
+                        style="@style/ReceiptDetailRow">
+                        <TextView
+                            style="@style/ReceiptDetailLabel"
+                            android:text="@string/payment_success_transaction_id" />
+                        <TextView
+                            android:id="@+id/tv_receipt_transaction_id"
+                            style="@style/ReceiptDetailValue" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/row_request_id"
+                        style="@style/ReceiptDetailRow">
+                        <TextView
+                            style="@style/ReceiptDetailLabel"
+                            android:text="@string/payment_success_request_id" />
+                        <TextView
+                            android:id="@+id/tv_receipt_request_id"
+                            style="@style/ReceiptDetailValue" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/row_date"
+                        style="@style/ReceiptDetailRow">
+                        <TextView
+                            style="@style/ReceiptDetailLabel"
+                            android:text="@string/payment_success_date" />
+                        <TextView
+                            android:id="@+id/tv_receipt_date"
+                            style="@style/ReceiptDetailValue" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/row_currency"
+                        style="@style/ReceiptDetailRow">
+                        <TextView
+                            style="@style/ReceiptDetailLabel"
+                            android:text="@string/payment_success_currency" />
+                        <TextView
+                            android:id="@+id/tv_receipt_currency"
+                            style="@style/ReceiptDetailValue" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/row_payer"
+                        style="@style/ReceiptDetailRow">
+                        <TextView
+                            style="@style/ReceiptDetailLabel"
+                            android:text="@string/payment_success_payer" />
+                        <TextView
+                            android:id="@+id/tv_receipt_payer"
+                            style="@style/ReceiptDetailValue" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/row_terminal"
+                        style="@style/ReceiptDetailRow">
+                        <TextView
+                            style="@style/ReceiptDetailLabel"
+                            android:text="@string/payment_success_terminal" />
+                        <TextView
+                            android:id="@+id/tv_receipt_terminal"
+                            style="@style/ReceiptDetailValue" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/row_merchant"
+                        style="@style/ReceiptDetailRow">
+                        <TextView
+                            style="@style/ReceiptDetailLabel"
+                            android:text="@string/payment_success_merchant" />
+                        <TextView
+                            android:id="@+id/tv_receipt_merchant"
+                            style="@style/ReceiptDetailValue" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="16dp"
+                        android:background="@color/divider" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:gravity="center"
+                        android:text="@string/payment_success_receipt_footer"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
@@ -89,13 +252,13 @@
         android:padding="@dimen/screen_margin">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_print"
+            android:id="@+id/btn_primary"
             style="@style/AccentButton"
             android:layout_width="0dp"
             android:layout_height="@dimen/button_height"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="@string/payment_success_print" />
+            android:text="@string/payment_success_view_details" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_return"
