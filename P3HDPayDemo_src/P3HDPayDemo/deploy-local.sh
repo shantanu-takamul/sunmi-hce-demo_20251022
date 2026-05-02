@@ -20,7 +20,7 @@ set -e
 PACKAGE="com.lfi.p3hd.demo"
 MAIN_ACTIVITY="$PACKAGE/.MainActivity"
 APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-WALLET_ID="ADCBCA87DA2BF8"    # D not zero — never change this
+WALLET_ID="ADCB1920276ECD"
 
 # ── Parse flags ──────────────────────────────────────────────────────────────
 BUILD=true
