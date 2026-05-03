@@ -69,7 +69,6 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
     }
 
     private void initView() {
-        initActionbar(R.string.qr_display_title);
         tvTimer = findViewById(R.id.tv_timer);
         TextView tvAmount = findViewById(R.id.tv_amount);
         tvAmount.setText("AED " + amountAed);
@@ -77,6 +76,7 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
         Bitmap qrBmp = buildQRBitmap(emvPayload, 600, 600);
         if (qrBmp != null) ivQr.setImageBitmap(qrBmp);
         findViewById(R.id.btn_cancel).setOnClickListener(v -> finish());
+        findViewById(R.id.btn_back).setOnClickListener(v -> finish());
     }
 
     private void startCountdown() {

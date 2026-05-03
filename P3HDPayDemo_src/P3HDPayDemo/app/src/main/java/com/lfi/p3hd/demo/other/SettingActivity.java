@@ -44,7 +44,7 @@ public class SettingActivity extends BaseAppCompatActivity {
     }
 
     private void initView() {
-        initActionbar(R.string.setting_title);
+        setupHeader(R.string.setting_header_label, R.string.setting_header_title, true);
         tvEnvValue      = findViewById(R.id.tv_env_value);
         tvApiKeyValue   = findViewById(R.id.tv_api_key_value);
         tvWalletIdValue = findViewById(R.id.tv_wallet_id_value);

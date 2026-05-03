@@ -2,6 +2,7 @@ package com.lfi.p3hd.demo.qr;
 
 import android.os.Bundle;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -12,11 +13,11 @@ public class QRExpiredActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_qr_expired);
-findViewById(R.id.btn_return).setOnClickListener(v -> finish());
-    }
-
-    @Override
-    public void onBackPressed() {
-        // Suppressed intentionally
+        // Suppress back navigation — user must tap Return to QR to continue.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() { /* intentionally suppressed */ }
+        });
+        findViewById(R.id.btn_return).setOnClickListener(v -> finish());
     }
 }

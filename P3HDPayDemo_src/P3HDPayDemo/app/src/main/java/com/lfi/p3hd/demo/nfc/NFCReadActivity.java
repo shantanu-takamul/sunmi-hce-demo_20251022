@@ -36,7 +36,7 @@ public class NFCReadActivity extends BaseAppCompatActivity {
     }
 
     private void initView() {
-        initActionbar(R.string.nfc_read_title);
+        setupHeader(R.string.nfc_read_header_label, R.string.nfc_read_header_title, true);
         tvInfo = findViewById(R.id.tv_info);
         findViewById(R.id.btn_start_scan).setOnClickListener(v -> startScan());
         findViewById(R.id.btn_stop_scan).setOnClickListener(v -> stopScan());

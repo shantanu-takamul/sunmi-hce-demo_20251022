@@ -44,7 +44,6 @@ public class NFCPayActivity extends BaseAppCompatActivity {
     }
 
     private void initView() {
-        initActionbar(R.string.nfc_pay_title);
         TextView tvAmount = findViewById(R.id.tv_amount);
         tvAmount.setText("AED " + amountAed);
 
@@ -53,6 +52,10 @@ public class NFCPayActivity extends BaseAppCompatActivity {
         tvTimer.setVisibility(android.view.View.GONE);
 
         findViewById(R.id.btn_cancel).setOnClickListener(v -> {
+            closeHce();
+            finish();
+        });
+        findViewById(R.id.btn_back).setOnClickListener(v -> {
             closeHce();
             finish();
         });

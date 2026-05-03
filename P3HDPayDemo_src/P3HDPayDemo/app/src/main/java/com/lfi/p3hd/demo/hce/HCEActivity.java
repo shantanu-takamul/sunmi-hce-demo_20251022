@@ -48,7 +48,7 @@ public class HCEActivity extends BaseAppCompatActivity {
     }
 
     private void initView() {
-        initActionbar(R.string.hce_title);
+        setupHeader(null, getString(R.string.hce_title), true);
         edtNdefData = findViewById(R.id.edt_ndef_text);
         tvInfo = findViewById(R.id.tv_info);
         rdgNfcType = findViewById(R.id.rdg_nfc_type);

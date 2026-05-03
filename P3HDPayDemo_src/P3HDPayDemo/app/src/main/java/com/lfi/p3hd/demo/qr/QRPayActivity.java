@@ -45,7 +45,7 @@ public class QRPayActivity extends BaseAppCompatActivity {
 
     private void initView() {
         boolean nfcMode = "nfc".equals(getIntent().getStringExtra("mode"));
-        initActionbar(nfcMode ? R.string.nfc_pay_title : R.string.qr_pay);
+        findViewById(R.id.btn_back).setOnClickListener(v -> finish());
         layoutInput = findViewById(R.id.layout_input);
         layoutLoading = findViewById(R.id.layout_loading);
         tvAmountInput = findViewById(R.id.tv_amount_input);

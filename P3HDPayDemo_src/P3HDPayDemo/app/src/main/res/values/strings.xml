@@ -116,4 +116,7 @@
     <string name="setting_refresh">Refresh</string>
     <string name="setting_wallet_id_label">Wallet ID</string>
     <string name="setting_wallet_id_title">Enter Wallet ID</string>
+
+    <!-- Navigation -->
+    <string name="back">Back</string>
 </resources>

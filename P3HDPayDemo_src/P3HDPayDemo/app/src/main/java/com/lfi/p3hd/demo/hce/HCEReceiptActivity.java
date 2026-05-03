@@ -29,7 +29,7 @@ public class HCEReceiptActivity extends BaseAppCompatActivity {
     }
 
     private void initView() {
-        initActionbar(R.string.hce_receipt_title);
+        setupHeader(R.string.hce_receipt_url_label, R.string.hce_receipt_title, true);
         edtUrl = findViewById(R.id.edt_url);
         edtUrl.setText("ddwallet://nfc?walletId=ADCB148E6BDC2C&merchantName=SHANS+SHOP&walletType=MICRO_MERCHANT");
         findViewById(R.id.btn_enable_nfc).setOnClickListener(v -> enableNfcTap());
