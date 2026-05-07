@@ -12,6 +12,8 @@ import androidx.annotation.Nullable;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.MyApplication;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.qr.QRConfig;
+import com.lfi.p3hd.demo.utils.PreferencesUtil;
 import com.sunmi.pay.hardware.aidl.AidlConstants;
 
 public class NFCPayActivity extends BaseAppCompatActivity {
@@ -24,11 +26,8 @@ public class NFCPayActivity extends BaseAppCompatActivity {
     private static final String PARAM_MERCHANT_NAME = "merchantName";
     private static final String PARAM_WALLET_TYPE   = "walletType";
     private static final String PARAM_AMOUNT        = "amount";
-    private static final String MERCHANT_NAME       = "CBDC Merchant";
-    private static final String WALLET_TYPE         = "MICRO_MERCHANT";
-    // Staging wallet — must exist in the backend the RN app validates against.
-    // Critical Fact #17: HCEReceiptActivity uses this same wallet for the same reason.
-    private static final String NFC_WALLET_ID       = "ADCB148E6BDC2C";
+    private static final String DEFAULT_MERCHANT_NAME = "CBDC Merchant";
+    private static final String WALLET_TYPE           = "MICRO_MERCHANT";
 
     private String amountAed;
 
@@ -83,11 +82,16 @@ public class NFCPayActivity extends BaseAppCompatActivity {
             return;
         }
         try {
+            String walletId = PreferencesUtil.getNfcWalletId();
+            if (walletId.isEmpty()) walletId = QRConfig.getDefaultWalletId();
+            String merchantName = PreferencesUtil.getNfcMerchantName();
+            if (merchantName.isEmpty()) merchantName = DEFAULT_MERCHANT_NAME;
+
             Uri uri = new Uri.Builder()
                     .scheme(DDWALLET_SCHEME)
                     .authority(DDWALLET_HOST)
-                    .appendQueryParameter(PARAM_WALLET_ID, NFC_WALLET_ID)
-                    .appendQueryParameter(PARAM_MERCHANT_NAME, MERCHANT_NAME)
+                    .appendQueryParameter(PARAM_WALLET_ID, walletId)
+                    .appendQueryParameter(PARAM_MERCHANT_NAME, merchantName)
                     .appendQueryParameter(PARAM_WALLET_TYPE, WALLET_TYPE)
                     .appendQueryParameter(PARAM_AMOUNT, amountAed)
                     .build();

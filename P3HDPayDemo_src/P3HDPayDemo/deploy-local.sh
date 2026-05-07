@@ -17,10 +17,62 @@
 
 set -e
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ENVIRONMENT — change ENV to switch between local and cloud targets
+# ══════════════════════════════════════════════════════════════════════════════
+ENV="demo"           # "local" | "demo" | "staging" | "qa" | "dev"
+
+# CF_TOKEN: Cloudflare Access JWT — required for all non-local environments.
+# Expires every ~24 hours.
+#
+# How to refresh:
+#   1. Open https://mithril-demo-backend.takamul.cc/swagger-ui/index.html in Chrome
+#   2. Sign in via Cloudflare Access (email OTP / SSO)
+#   3. DevTools → Application → Cookies → copy CF_Authorization value
+#   4. Paste it below (replace everything after CF_TOKEN=)
+#
+CF_TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImUxNjA4YzQxYTRhZWNlNjk2ZmJhNzE3NWQ2NGY4NWVmYTRkODc4NTZjYzFjYjAzYjRiZTdlMzgzY2Y4MGE3NDIifQ.eyJ0eXBlIjoiYXBwIiwiaWF0IjoxNzc4MDA3OTI1LCJleHAiOjE3NzgwOTQzMjYsImlzcyI6Imh0dHBzOi8vdGFrYW11bC5jbG91ZGZsYXJlYWNjZXNzLmNvbSIsInN1YiI6ImVlMjVjNDViLWNjNTMtNTdjZS04NmIyLTMzMmI3YmJhYmRmNyIsImF1ZCI6IjBjOWZmNmM5Y2MwY2I0YTFmYjY4MGU0M2FhMWMwODE4NmZlNTVlNTQyNDI3NzUzZTE2NGQyMTY2YjRhNTExN2UiLCJkZXZpY2VfaWQiOiI3NWE3MTI1NS1jYzMzLTExZjAtODNiYi04YWFlNjJkZjgwZmEiLCJlbWFpbCI6InNoYW50YW51LmJob3NhbGVAdGFrYW11bC5haSIsIndhcnBfYXNfYXV0aCI6dHJ1ZX0.bSm5wj2BexPhRAXwRFZhRmjg_Zc2N4BoehkbaocR7LS0CNdAniGCCoaXYIlBBn0vAtrV-FGUNuUYI2V0u2EUsIiu7wRPZGj9zI8YP876RE-VJ_4xPMV4B7vgSgumW9obK9MCKcnt5CkT2wgrZQJWzNTEbYO-vy1mEmT_SPKNQ2DrVkXBABSSATe7hszO0i-D-iDAaHvp2NABNKE5bKZkhtrul8ZKQ1O1naJMOXGzUdtaX2fUkuDRaf1Xk13H_7S3pR5uSvoygNUb7xO0fePFB-dH3Jdl-05ufpH-Eb5jKwW-pgm0Loc-YCpF0UztE2yZBeyBtKazmIshCcMn6V6EdA"
+# ══════════════════════════════════════════════════════════════════════════════
+
 PACKAGE="com.lfi.p3hd.demo"
 MAIN_ACTIVITY="$PACKAGE/.MainActivity"
 APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-WALLET_ID="ADCB1920276ECD"
+
+# Resolve env-specific values
+case "$ENV" in
+    demo)
+        BASE_URL="https://mithril-demo-backend.takamul.cc"
+        LFI_ID="acq-NEOPAY"
+        WALLET_ID="NEOP15B3159B17"
+        ;;
+    staging)
+        BASE_URL="https://mithril-staging-backend.takamul.cc"
+        LFI_ID="acq-NEOPAY"
+        WALLET_ID="NEOP979F8901FC"
+        ;;
+    qa)
+        BASE_URL="https://mithril-qa-backend.takamul.cc"
+        LFI_ID="lfi-ADCB"
+        WALLET_ID="ADCB1920276ECD"
+        ;;
+    dev)
+        BASE_URL="https://mithril-dev-backend.takamul.cc"
+        LFI_ID="lfi-ADCB"
+        WALLET_ID="ADCB1920276ECD"
+        ;;
+    local|*)
+        BASE_URL="http://localhost:3000"
+        LFI_ID="lfi-ADCB"
+        WALLET_ID="ADCB1920276ECD"
+        ;;
+esac
+
+# Build CF header args for curl — empty when targeting local
+if [ "$ENV" != "local" ]; then
+    CF_HEADERS=(-H "Cookie: CF_Authorization=$CF_TOKEN" -H "CF-Access-Jwt-Assertion: $CF_TOKEN")
+else
+    CF_HEADERS=()
+fi
 
 # ── Parse flags ──────────────────────────────────────────────────────────────
 BUILD=true
@@ -95,27 +147,33 @@ if [ "$INSTALL" = true ]; then
     # NOTE: adb install resets all reverse port-forwarding rules — tunnel comes next.
 fi
 
-# ── 4. ADB reverse tunnel ────────────────────────────────────────────────────
-echo ""
-echo "▶ Setting up reverse tunnel: POS localhost:3000 → Mac localhost:3000..."
-adb -s "$SUNMI_SERIAL" reverse tcp:3000 tcp:3000
+# ── 4. ADB reverse tunnel (local only) ───────────────────────────────────────
+if [ "$ENV" = "local" ]; then
+    echo ""
+    echo "▶ Setting up reverse tunnel: POS localhost:3000 → Mac localhost:3000..."
+    adb -s "$SUNMI_SERIAL" reverse tcp:3000 tcp:3000
+    echo "  Active rules:"
+    adb -s "$SUNMI_SERIAL" reverse --list | sed 's/^/    /'
+else
+    echo ""
+    echo "  (tunnel not needed — ENV=$ENV points to $BASE_URL)"
+fi
 
-echo "  Active rules:"
-adb -s "$SUNMI_SERIAL" reverse --list | sed 's/^/    /'
-
-# ── 5. Fetch API key from local server ────────────────────────────────────────
+# ── 5. Fetch API key ──────────────────────────────────────────────────────────
 echo ""
-echo "▶ Fetching API key from local server..."
+echo "▶ Fetching API key from $BASE_URL..."
 LFI_API_KEY=""
 if command -v python3 &>/dev/null; then
-    AUTH_RESP=$(curl -s -X POST "http://localhost:3000/web/api/v1/auth/login" \
+    AUTH_RESP=$(curl -s -X POST "$BASE_URL/web/api/v1/auth/login" \
+        "${CF_HEADERS[@]}" \
         -H "Content-Type: application/json" \
         -d '{"username":"test-global-admin","password":"12345","realm":"cbuae"}' 2>/dev/null)
     ACCESS_TOKEN=$(echo "$AUTH_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
     if [ -n "$ACCESS_TOKEN" ]; then
-        REGEN_RESP=$(curl -s -X POST "http://localhost:3000/web/api/v1/lfis/lfi-ADCB/inbound-api-config/regenerate" \
+        REGEN_RESP=$(curl -s -X POST "$BASE_URL/web/api/v1/lfis/$LFI_ID/inbound-api-config/regenerate" \
+            "${CF_HEADERS[@]}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -H "X-LFI-ID: lfi-ADCB" \
+            -H "X-LFI-ID: $LFI_ID" \
             -H "X-Idempotency-Key: $(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo deploy-$(date +%s))" \
             -H "Content-Type: application/json" \
             -d '{"keyType":"PRIMARY","expiryDays":90}' 2>/dev/null)
@@ -125,8 +183,12 @@ fi
 if [ -n "$LFI_API_KEY" ]; then
     echo "  API key obtained: ${LFI_API_KEY:0:12}..."
 else
-    echo "  ⚠ Could not fetch API key (local server not running?). QR generate may fail."
-    echo "    To fix: open app → Settings → Refresh"
+    if [ "$ENV" != "local" ] && [ -z "$CF_TOKEN" ]; then
+        echo "  ⚠ CF_TOKEN is empty — update it at the top of this script."
+    else
+        echo "  ⚠ Could not fetch API key. QR generate may fail."
+        echo "    To fix: open app → Settings → Refresh Key"
+    fi
 fi
 
 # ── 6. Write env=local + api_key to SharedPreferences ─────────────────────────
@@ -134,7 +196,7 @@ fi
 # Pipe the XML directly via stdin → run-as tee (avoids sdcard permission issues
 # on Sunmi devices where the app user cannot read /sdcard under SELinux policy).
 echo ""
-echo "▶ Configuring app: env=local, wallet_id=$WALLET_ID..."
+echo "▶ Configuring app: env=$ENV, wallet_id=$WALLET_ID..."
 
 adb -s "$SUNMI_SERIAL" shell am force-stop "$PACKAGE" 2>/dev/null || true
 
@@ -142,14 +204,14 @@ PREFS_PATH="/data/data/$PACKAGE/shared_prefs/p3hd_pref.xml"
 if [ -n "$LFI_API_KEY" ]; then
     PREFS_XML="<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>
 <map>
-    <string name=\"auth:env\">local</string>
+    <string name=\"auth:env\">${ENV}</string>
     <string name=\"wallet_id\">${WALLET_ID}</string>
     <string name=\"lfi_api_key\">${LFI_API_KEY}</string>
 </map>"
 else
     PREFS_XML="<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>
 <map>
-    <string name=\"auth:env\">local</string>
+    <string name=\"auth:env\">${ENV}</string>
     <string name=\"wallet_id\">${WALLET_ID}</string>
 </map>"
 fi
@@ -173,8 +235,10 @@ echo "────────────────────────�
 echo "✓  P3HD Pay Demo is running"
 echo ""
 echo "   Device  : $SUNMI_SERIAL  ($MODEL)"
-echo "   Env     : local → http://localhost:3000"
+echo "   Env     : $ENV → $BASE_URL"
+if [ "$ENV" = "local" ]; then
 echo "   Tunnel  : POS :3000 → Mac :3000  (active)"
+fi
 echo "   Wallet  : $WALLET_ID"
 if [ -n "$LFI_API_KEY" ]; then
     echo "   API key : ${LFI_API_KEY:0:12}... (written to prefs)"

@@ -28,6 +28,7 @@
     <string name="qr_pay_amount_error">Please enter a valid amount greater than 0</string>
     <string name="qr_pay_error_network">Network error</string>
     <string name="qr_pay_error_parse">Invalid response from server</string>
+    <string name="qr_pay_status_preparing">Preparing payment gateway\u2026</string>
     <string name="qr_pay_status_generating">Generating QR code\u2026</string>
     <string name="qr_pay_scan_instruction">Ask customer to scan QR code</string>
     <string name="qr_pay_generate">Generate QR</string>
@@ -114,8 +115,24 @@
     <string name="setting_change">Change</string>
     <string name="setting_api_key_label">API Key</string>
     <string name="setting_refresh">Refresh</string>
-    <string name="setting_wallet_id_label">Wallet ID</string>
+    <string name="setting_wallet_id_label">QR Wallet ID</string>
     <string name="setting_wallet_id_title">Enter Wallet ID</string>
+    <string name="setting_nfc_wallet_id_label">NFC Wallet ID</string>
+    <string name="setting_nfc_wallet_id_title">Enter NFC Wallet ID</string>
+    <string name="setting_nfc_merchant_name_label">NFC Merchant Name</string>
+    <string name="setting_nfc_merchant_name_title">Enter Merchant Name</string>
+
+    <!-- Transaction History -->
+    <string name="card_tx_history">Transactions</string>
+    <string name="card_tx_history_desc">View and refund recent payments</string>
+    <string name="tx_history_header_label">Payment history</string>
+    <string name="tx_history_title">Transaction History</string>
+    <string name="tx_history_loading">Loading transactions…</string>
+    <string name="tx_history_empty">No transactions found</string>
+    <string name="tx_history_empty_sub">No transactions in the last 30 days</string>
+    <string name="tx_view">View Details</string>
+    <string name="tx_refund">Refund</string>
+    <string name="tx_already_refunded">Refunded</string>
 
     <!-- Navigation -->
     <string name="back">Back</string>

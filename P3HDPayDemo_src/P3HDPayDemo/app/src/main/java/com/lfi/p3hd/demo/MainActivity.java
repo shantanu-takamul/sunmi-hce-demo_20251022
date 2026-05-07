@@ -12,6 +12,7 @@ import com.lfi.p3hd.demo.hce.HCEReceiptActivity;
 import com.lfi.p3hd.demo.nfc.NFCReadActivity;
 import com.lfi.p3hd.demo.other.SettingActivity;
 import com.lfi.p3hd.demo.qr.QRPayActivity;
+import com.lfi.p3hd.demo.qr.TransactionHistoryActivity;
 
 public class MainActivity extends AppCompatActivity {
     private TextView tvSdkStatus;
@@ -53,6 +54,9 @@ public class MainActivity extends AppCompatActivity {
 
         findViewById(R.id.card_settings).setOnClickListener(v ->
             startActivity(new Intent(this, SettingActivity.class)));
+
+        findViewById(R.id.card_tx_history).setOnClickListener(v ->
+            startActivity(new Intent(this, TransactionHistoryActivity.class)));
     }
 
     private void updateSdkStatus() {

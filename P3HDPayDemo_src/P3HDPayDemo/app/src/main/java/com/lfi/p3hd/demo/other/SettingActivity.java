@@ -2,7 +2,6 @@ package com.lfi.p3hd.demo.other;
 
 import android.app.AlertDialog;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -11,30 +10,16 @@ import androidx.annotation.Nullable;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
 import com.lfi.p3hd.demo.qr.QRConfig;
+import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
-import org.json.JSONObject;
-
-import java.io.IOException;
-import java.util.UUID;
-
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-
 public class SettingActivity extends BaseAppCompatActivity {
-    private static final String LFI_AUTH_USERNAME = "test-global-admin";
-    private static final String LFI_AUTH_PASSWORD = "12345";
-    private static final String LFI_AUTH_REALM    = "cbuae";
 
     private TextView tvEnvValue;
     private TextView tvApiKeyValue;
     private TextView tvWalletIdValue;
-    private final OkHttpClient httpClient = new OkHttpClient();
+    private TextView tvNfcWalletIdValue;
+    private TextView tvNfcMerchantNameValue;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -45,14 +30,18 @@ public class SettingActivity extends BaseAppCompatActivity {
 
     private void initView() {
         setupHeader(R.string.setting_header_label, R.string.setting_header_title, true);
-        tvEnvValue      = findViewById(R.id.tv_env_value);
-        tvApiKeyValue   = findViewById(R.id.tv_api_key_value);
-        tvWalletIdValue = findViewById(R.id.tv_wallet_id_value);
+        tvEnvValue            = findViewById(R.id.tv_env_value);
+        tvApiKeyValue         = findViewById(R.id.tv_api_key_value);
+        tvWalletIdValue       = findViewById(R.id.tv_wallet_id_value);
+        tvNfcWalletIdValue    = findViewById(R.id.tv_nfc_wallet_id_value);
+        tvNfcMerchantNameValue = findViewById(R.id.tv_nfc_merchant_name_value);
 
         updateDisplay();
 
         findViewById(R.id.btn_change_env).setOnClickListener(v -> showEnvPicker());
-        findViewById(R.id.btn_refresh_key).setOnClickListener(v -> fetchLfiApiKey());
+        findViewById(R.id.btn_refresh_key).setOnClickListener(v -> fetchApiKey());
+        findViewById(R.id.btn_edit_nfc_wallet).setOnClickListener(v -> showNfcWalletIdInput());
+        findViewById(R.id.btn_edit_nfc_merchant).setOnClickListener(v -> showNfcMerchantNameInput());
     }
 
     private void updateDisplay() {
@@ -60,7 +49,11 @@ public class SettingActivity extends BaseAppCompatActivity {
         String apiKey = PreferencesUtil.getLfiApiKey();
         tvApiKeyValue.setText(apiKey.isEmpty() ? "Not set" : maskApiKey(apiKey));
         String walletId = PreferencesUtil.getWalletId();
-        tvWalletIdValue.setText(walletId.isEmpty() ? QRConfig.WALLET_ID + " (default)" : walletId);
+        tvWalletIdValue.setText(walletId.isEmpty() ? QRConfig.getDefaultWalletId() + " (default)" : walletId);
+        String nfcWalletId = PreferencesUtil.getNfcWalletId();
+        tvNfcWalletIdValue.setText(nfcWalletId.isEmpty() ? QRConfig.getDefaultWalletId() + " (default)" : nfcWalletId);
+        String nfcMerchantName = PreferencesUtil.getNfcMerchantName();
+        tvNfcMerchantNameValue.setText(nfcMerchantName.isEmpty() ? "CBDC Merchant (default)" : nfcMerchantName);
     }
 
     private String maskApiKey(String key) {
@@ -88,8 +81,9 @@ public class SettingActivity extends BaseAppCompatActivity {
     private void showWalletIdInput(String selectedEnv) {
         EditText input = new EditText(this);
         String current = PreferencesUtil.getWalletId();
-        input.setHint(QRConfig.WALLET_ID);
-        input.setText(current.isEmpty() ? QRConfig.WALLET_ID : current);
+        String envDefault = QRConfig.getDefaultWalletId(selectedEnv);
+        input.setHint(envDefault);
+        input.setText(envDefault);
 
         new AlertDialog.Builder(this)
             .setTitle(R.string.setting_wallet_id_title)
@@ -97,104 +91,63 @@ public class SettingActivity extends BaseAppCompatActivity {
             .setPositiveButton(android.R.string.ok, (d, w) -> {
                 String walletId = input.getText().toString().trim();
                 PreferencesUtil.setEnv(selectedEnv);
-                PreferencesUtil.setWalletId(walletId.isEmpty() ? QRConfig.WALLET_ID : walletId);
-                PreferencesUtil.setLfiApiKey("");
+                PreferencesUtil.setWalletId(walletId.isEmpty() ? envDefault : walletId);
                 updateDisplay();
-                fetchLfiApiKey();
+                fetchApiKey();
             })
             .setNegativeButton(android.R.string.cancel, null)
             .show();
     }
 
-    private void fetchLfiApiKey() {
-        showToast("Fetching API key...");
-        try {
-            JSONObject loginBody = new JSONObject();
-            loginBody.put("username", LFI_AUTH_USERNAME);
-            loginBody.put("password", LFI_AUTH_PASSWORD);
-            loginBody.put("realm", LFI_AUTH_REALM);
+    private void showNfcWalletIdInput() {
+        EditText input = new EditText(this);
+        String current = PreferencesUtil.getNfcWalletId();
+        String envDefault = QRConfig.getDefaultWalletId();
+        input.setHint(envDefault);
+        input.setText(current.isEmpty() ? envDefault : current);
 
-            String loginUrl = QRConfig.getBaseUrl() + QRConfig.AUTH_ENDPOINT;
-            Request loginReq = new Request.Builder()
-                .url(loginUrl)
-                .addHeader("Content-Type", "application/json")
-                .post(RequestBody.create(MediaType.parse("application/json"), loginBody.toString()))
-                .build();
-
-            httpClient.newCall(loginReq).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    showToast("Auth failed: " + e.getMessage());
-                }
-
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    String body = response.body().string();
-                    Log.d(TAG, "Auth response: " + body);
-                    if (!response.isSuccessful()) {
-                        showToast("Auth failed (HTTP " + response.code() + ")");
-                        return;
-                    }
-                    try {
-                        String accessToken = new JSONObject(body).getString("access_token");
-                        regenApiKey(accessToken);
-                    } catch (Exception e) {
-                        showToast("Auth parse error");
-                    }
-                }
-            });
-        } catch (Exception e) {
-            showToast("fetchLfiApiKey error: " + e.getMessage());
-        }
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.setting_nfc_wallet_id_title)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok, (d, w) -> {
+                String value = input.getText().toString().trim();
+                PreferencesUtil.setNfcWalletId(value.isEmpty() ? envDefault : value);
+                updateDisplay();
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
     }
 
-    private void regenApiKey(String accessToken) {
-        try {
-            JSONObject regenBody = new JSONObject();
-            regenBody.put("keyType", "PRIMARY");
-            regenBody.put("expiryDays", 90);
+    private void showNfcMerchantNameInput() {
+        EditText input = new EditText(this);
+        String current = PreferencesUtil.getNfcMerchantName();
+        input.setHint("CBDC Merchant");
+        input.setText(current.isEmpty() ? "CBDC Merchant" : current);
 
-            String regenUrl = QRConfig.getBaseUrl() + QRConfig.REGEN_ENDPOINT;
-            Request regenReq = new Request.Builder()
-                .url(regenUrl)
-                .addHeader("Authorization", "Bearer " + accessToken)
-                .addHeader("X-LFI-ID", QRConfig.X_LFI_ID)
-                .addHeader("X-Idempotency-Key", UUID.randomUUID().toString())
-                .addHeader("Content-Type", "application/json")
-                .post(RequestBody.create(MediaType.parse("application/json"), regenBody.toString()))
-                .build();
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.setting_nfc_merchant_name_title)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok, (d, w) -> {
+                String value = input.getText().toString().trim();
+                PreferencesUtil.setNfcMerchantName(value.isEmpty() ? "CBDC Merchant" : value);
+                updateDisplay();
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
 
-            httpClient.newCall(regenReq).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    showToast("Key regen failed: " + e.getMessage());
-                }
-
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    String body = response.body().string();
-                    Log.d(TAG, "Regen response: " + body);
-                    if (!response.isSuccessful()) {
-                        showToast("Key regen failed (HTTP " + response.code() + ")");
-                        return;
-                    }
-                    try {
-                        JSONObject json = new JSONObject(body);
-                        String apiKey   = json.getString("apiKey");
-                        String expiresAt = json.optString("expiresAt", "");
-                        PreferencesUtil.setLfiApiKey(apiKey);
-                        PreferencesUtil.setLfiApiKeyExpiry(expiresAt);
-                        runOnUiThread(() -> {
-                            updateDisplay();
-                            showToast("API key ready (" + PreferencesUtil.getEnv() + ")");
-                        });
-                    } catch (Exception e) {
-                        showToast("Key regen parse error");
-                    }
-                }
-            });
-        } catch (Exception e) {
-            showToast("regenApiKey error: " + e.getMessage());
-        }
+    private void fetchApiKey() {
+        showToast("Fetching API key...");
+        ApiKeyManager.get().fetch(
+            () -> {
+                if (isFinishing()) return;
+                updateDisplay();
+                showToast("API key ready (" + PreferencesUtil.getEnv() + ")");
+            },
+            errorMsg -> {
+                if (isFinishing()) return;
+                showToast(errorMsg);
+            }
+        );
     }
 }

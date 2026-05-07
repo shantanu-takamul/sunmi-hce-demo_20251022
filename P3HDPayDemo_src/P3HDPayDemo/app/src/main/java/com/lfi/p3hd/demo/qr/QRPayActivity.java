@@ -12,6 +12,7 @@ import androidx.annotation.Nullable;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
 import com.lfi.p3hd.demo.nfc.NFCPayActivity;
+import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
 import org.json.JSONObject;
@@ -31,6 +32,7 @@ public class QRPayActivity extends BaseAppCompatActivity {
     private LinearLayout layoutInput;
     private LinearLayout layoutLoading;
     private TextView tvAmountInput;
+    private TextView tvLoadingStatus;
 
     private final StringBuilder amountBuilder = new StringBuilder("0");
     private String lastRequestId;
@@ -49,6 +51,7 @@ public class QRPayActivity extends BaseAppCompatActivity {
         layoutInput = findViewById(R.id.layout_input);
         layoutLoading = findViewById(R.id.layout_loading);
         tvAmountInput = findViewById(R.id.tv_amount_input);
+        tvLoadingStatus = findViewById(R.id.tv_loading_status);
 
         int[] digitIds = {
             R.id.btn_1, R.id.btn_2, R.id.btn_3,
@@ -85,7 +88,8 @@ public class QRPayActivity extends BaseAppCompatActivity {
         layoutLoading.setVisibility(View.GONE);
     }
 
-    private void showLoadingState() {
+    private void showLoadingState(String message) {
+        tvLoadingStatus.setText(message);
         layoutInput.setVisibility(View.GONE);
         layoutLoading.setVisibility(View.VISIBLE);
     }
@@ -121,11 +125,25 @@ public class QRPayActivity extends BaseAppCompatActivity {
             if (amountStr.endsWith(".")) amountStr = amountStr.substring(0, amountStr.length() - 1);
             double amountAed = Double.parseDouble(amountStr);
             if (amountAed <= 0) throw new NumberFormatException("zero");
-            long amountFils = Math.round(amountAed * 100);
-            String requestId = UUID.randomUUID().toString();
+            final long amountFils = Math.round(amountAed * 100);
+            final String finalAmountStr = amountStr;
+            final String requestId = UUID.randomUUID().toString();
             lastRequestId = requestId;
-            showLoadingState();
-            generateQR(amountFils, amountStr, requestId);
+
+            showLoadingState(getString(R.string.qr_pay_status_preparing));
+
+            ApiKeyManager.get().ensureReady(
+                () -> {
+                    if (isFinishing()) return;
+                    tvLoadingStatus.setText(R.string.qr_pay_status_generating);
+                    generateQR(amountFils, finalAmountStr, requestId);
+                },
+                errorMsg -> {
+                    if (isFinishing()) return;
+                    showInputState();
+                    showToast(errorMsg);
+                }
+            );
         } catch (NumberFormatException e) {
             showToast(R.string.qr_pay_amount_error);
         }
@@ -153,7 +171,7 @@ public class QRPayActivity extends BaseAppCompatActivity {
             JSONObject body = new JSONObject();
             String walletId = PreferencesUtil.getWalletId();
             body.put("qrType", QRConfig.QR_TYPE);
-            body.put("walletId", walletId.isEmpty() ? QRConfig.WALLET_ID : walletId);
+            body.put("walletId", walletId.isEmpty() ? QRConfig.getDefaultWalletId() : walletId);
             body.put("amount", amountFils);
             body.put("currency", QRConfig.CURRENCY);
             body.put("terminalId", QRConfig.TERMINAL_ID);
@@ -163,7 +181,7 @@ public class QRPayActivity extends BaseAppCompatActivity {
             String url = QRConfig.getBaseUrl() + QRConfig.QR_ENDPOINT + "?requestId=" + requestId;
             Request.Builder reqBuilder = new Request.Builder()
                 .url(url)
-                .addHeader("X-LFI-ID", QRConfig.X_LFI_ID)
+                .addHeader("X-LFI-ID", QRConfig.getXLfiId())
                 .addHeader("Content-Type", "application/json")
                 .post(RequestBody.create(MediaType.parse("application/json"), body.toString()));
 

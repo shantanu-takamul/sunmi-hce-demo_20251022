@@ -20,6 +20,7 @@ import com.google.android.material.button.MaterialButton;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.MyApplication;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -141,13 +142,14 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
             .addQueryParameter("requestId", requestId)
             .build();
 
-        Request request = new Request.Builder()
+        Request.Builder reqBuilder = new Request.Builder()
             .url(url)
-            .addHeader("X-LFI-ID", QRConfig.X_LFI_ID)
-            .get()
-            .build();
+            .addHeader("X-LFI-ID", QRConfig.getXLfiId())
+            .get();
+        String apiKey = PreferencesUtil.getLfiApiKey();
+        if (!apiKey.isEmpty()) reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
 
-        try (Response response = httpClient.newCall(request).execute()) {
+        try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
             String body = response.body() == null ? "" : response.body().string();
             Log.d(TAG, "fetchTransactionDetails [" + response.code() + "]: " + body);
             if (!response.isSuccessful()) {

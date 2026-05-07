@@ -78,5 +78,10 @@
             android:parentActivityName=".MainActivity"
             android:windowSoftInputMode="stateAlwaysHidden" />
 
+        <activity
+            android:name=".qr.TransactionHistoryActivity"
+            android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="stateAlwaysHidden" />
+
     </application>
 </manifest>

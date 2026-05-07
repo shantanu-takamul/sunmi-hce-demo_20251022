@@ -18,6 +18,7 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -110,11 +111,13 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
 
     private void checkPaymentStatus(String reqId) {
         String url = QRConfig.getBaseUrl() + QRConfig.QR_STATUS_ENDPOINT + "?requestId=" + reqId;
-        Request request = new Request.Builder()
+        Request.Builder reqBuilder = new Request.Builder()
             .url(url)
-            .addHeader("X-LFI-ID", QRConfig.X_LFI_ID)
-            .get()
-            .build();
+            .addHeader("X-LFI-ID", QRConfig.getXLfiId())
+            .get();
+        String apiKey = PreferencesUtil.getLfiApiKey();
+        if (!apiKey.isEmpty()) reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
+        Request request = reqBuilder.build();
 
         httpClient.newCall(request).enqueue(new Callback() {
             @Override
