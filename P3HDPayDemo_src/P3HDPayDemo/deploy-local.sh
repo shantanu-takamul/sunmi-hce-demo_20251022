@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 # deploy-local.sh — Build, install, tunnel, and launch P3HD Pay Demo
-#                   pointed at your Mac's localhost:3000.
 #
 # Usage:
-#   ./deploy-local.sh              — full build + install + tunnel + launch
-#   ./deploy-local.sh --no-build   — skip Gradle, re-install last APK, re-tunnel
+#   ./deploy-local.sh              — full build + install + launch
+#   ./deploy-local.sh --no-build   — skip Gradle, re-install last APK
 #   ./deploy-local.sh --tunnel-only — skip build+install, just re-tunnel + relaunch
 #                                     (handy after a USB reconnect that killed the tunnel)
 #
 # How it works:
-#   `adb install` always resets ADB reverse port-forwarding rules.
-#   This script therefore runs `adb reverse tcp:3000 tcp:3000` AFTER install so
-#   the POS device's http://localhost:3000 always routes to your Mac's :3000.
-#   It also force-stops the app, writes env=local to SharedPreferences on-device,
-#   then relaunches — so the app picks up the local URL on first open.
+#   Builds the APK, installs it on the connected Sunmi device, fetches a fresh
+#   API key from the target backend, writes env + wallet_id + api_key to
+#   SharedPreferences on-device, then relaunches the app.
+#   For local env only: sets up an adb reverse tunnel so the device reaches
+#   your Mac's localhost:3000.
 
 set -e
 
@@ -21,17 +20,6 @@ set -e
 # ENVIRONMENT — change ENV to switch between local and cloud targets
 # ══════════════════════════════════════════════════════════════════════════════
 ENV="demo"           # "local" | "demo" | "staging" | "qa" | "dev"
-
-# CF_TOKEN: Cloudflare Access JWT — required for all non-local environments.
-# Expires every ~24 hours.
-#
-# How to refresh:
-#   1. Open https://mithril-demo-backend.takamul.cc/swagger-ui/index.html in Chrome
-#   2. Sign in via Cloudflare Access (email OTP / SSO)
-#   3. DevTools → Application → Cookies → copy CF_Authorization value
-#   4. Paste it below (replace everything after CF_TOKEN=)
-#
-CF_TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImUxNjA4YzQxYTRhZWNlNjk2ZmJhNzE3NWQ2NGY4NWVmYTRkODc4NTZjYzFjYjAzYjRiZTdlMzgzY2Y4MGE3NDIifQ.eyJ0eXBlIjoiYXBwIiwiaWF0IjoxNzc4MDA3OTI1LCJleHAiOjE3NzgwOTQzMjYsImlzcyI6Imh0dHBzOi8vdGFrYW11bC5jbG91ZGZsYXJlYWNjZXNzLmNvbSIsInN1YiI6ImVlMjVjNDViLWNjNTMtNTdjZS04NmIyLTMzMmI3YmJhYmRmNyIsImF1ZCI6IjBjOWZmNmM5Y2MwY2I0YTFmYjY4MGU0M2FhMWMwODE4NmZlNTVlNTQyNDI3NzUzZTE2NGQyMTY2YjRhNTExN2UiLCJkZXZpY2VfaWQiOiI3NWE3MTI1NS1jYzMzLTExZjAtODNiYi04YWFlNjJkZjgwZmEiLCJlbWFpbCI6InNoYW50YW51LmJob3NhbGVAdGFrYW11bC5haSIsIndhcnBfYXNfYXV0aCI6dHJ1ZX0.bSm5wj2BexPhRAXwRFZhRmjg_Zc2N4BoehkbaocR7LS0CNdAniGCCoaXYIlBBn0vAtrV-FGUNuUYI2V0u2EUsIiu7wRPZGj9zI8YP876RE-VJ_4xPMV4B7vgSgumW9obK9MCKcnt5CkT2wgrZQJWzNTEbYO-vy1mEmT_SPKNQ2DrVkXBABSSATe7hszO0i-D-iDAaHvp2NABNKE5bKZkhtrul8ZKQ1O1naJMOXGzUdtaX2fUkuDRaf1Xk13H_7S3pR5uSvoygNUb7xO0fePFB-dH3Jdl-05ufpH-Eb5jKwW-pgm0Loc-YCpF0UztE2yZBeyBtKazmIshCcMn6V6EdA"
 # ══════════════════════════════════════════════════════════════════════════════
 
 PACKAGE="com.lfi.p3hd.demo"
@@ -66,13 +54,6 @@ case "$ENV" in
         WALLET_ID="ADCB1920276ECD"
         ;;
 esac
-
-# Build CF header args for curl — empty when targeting local
-if [ "$ENV" != "local" ]; then
-    CF_HEADERS=(-H "Cookie: CF_Authorization=$CF_TOKEN" -H "CF-Access-Jwt-Assertion: $CF_TOKEN")
-else
-    CF_HEADERS=()
-fi
 
 # ── Parse flags ──────────────────────────────────────────────────────────────
 BUILD=true
@@ -165,13 +146,11 @@ echo "▶ Fetching API key from $BASE_URL..."
 LFI_API_KEY=""
 if command -v python3 &>/dev/null; then
     AUTH_RESP=$(curl -s -X POST "$BASE_URL/web/api/v1/auth/login" \
-        "${CF_HEADERS[@]}" \
         -H "Content-Type: application/json" \
         -d '{"username":"test-global-admin","password":"12345","realm":"cbuae"}' 2>/dev/null)
     ACCESS_TOKEN=$(echo "$AUTH_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
     if [ -n "$ACCESS_TOKEN" ]; then
         REGEN_RESP=$(curl -s -X POST "$BASE_URL/web/api/v1/lfis/$LFI_ID/inbound-api-config/regenerate" \
-            "${CF_HEADERS[@]}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "X-LFI-ID: $LFI_ID" \
             -H "X-Idempotency-Key: $(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo deploy-$(date +%s))" \
@@ -183,15 +162,11 @@ fi
 if [ -n "$LFI_API_KEY" ]; then
     echo "  API key obtained: ${LFI_API_KEY:0:12}..."
 else
-    if [ "$ENV" != "local" ] && [ -z "$CF_TOKEN" ]; then
-        echo "  ⚠ CF_TOKEN is empty — update it at the top of this script."
-    else
-        echo "  ⚠ Could not fetch API key. QR generate may fail."
-        echo "    To fix: open app → Settings → Refresh Key"
-    fi
+    echo "  ⚠ Could not fetch API key. QR generate may fail."
+    echo "    To fix: open app → Settings → Refresh Key"
 fi
 
-# ── 6. Write env=local + api_key to SharedPreferences ─────────────────────────
+# ── 6. Write env + wallet_id + api_key to SharedPreferences ──────────────────
 # Force-stop first so Android re-reads prefs from disk on next launch.
 # Pipe the XML directly via stdin → run-as tee (avoids sdcard permission issues
 # on Sunmi devices where the app user cannot read /sdcard under SELinux policy).
@@ -218,10 +193,10 @@ fi
 
 if printf '%s\n' "$PREFS_XML" | \
     adb -s "$SUNMI_SERIAL" shell "run-as $PACKAGE tee $PREFS_PATH" > /dev/null 2>&1; then
-    echo "  SharedPreferences written (env=local)."
+    echo "  SharedPreferences written (env=$ENV)."
 else
     echo "  ⚠ Could not write SharedPreferences automatically."
-    echo "    Workaround: open the app → Settings → Change → select 'local' manually."
+    echo "    Workaround: open the app → Settings → Change → select '$ENV' manually."
 fi
 
 # ── 7. Launch app ─────────────────────────────────────────────────────────────
@@ -249,11 +224,13 @@ echo "────────────────────────�
 echo ""
 echo "  Quick test:"
 echo "    1. Tap 'QR Payment' → enter amount → 'Generate QR'"
-echo "    2. Watch your local server receive POST /lfi-gateway/api/v1/qr/generate"
+echo "    2. QR should appear within 2 seconds"
 echo ""
 echo "  Logcat (all app tags):"
-echo "    adb -s $SUNMI_SERIAL logcat -s QRPayActivity:D QRDisplayActivity:D NFCPayActivity:D PaymentSuccessActivity:D SettingActivity:D"
+echo "    adb -s $SUNMI_SERIAL logcat -s QRPayActivity:D QRDisplayActivity:D ApiKeyManager:D"
 echo ""
+if [ "$ENV" = "local" ]; then
 echo "  If tunnel drops (USB reconnect), run:"
 echo "    ./deploy-local.sh --tunnel-only"
 echo ""
+fi
