@@ -167,6 +167,10 @@ public class QRPayActivity extends BaseAppCompatActivity {
     }
 
     private void generateQR(long amountFils, String amountDisplayAed, String requestId) {
+        generateQR(amountFils, amountDisplayAed, requestId, false);
+    }
+
+    private void generateQR(long amountFils, String amountDisplayAed, String requestId, boolean isRetry) {
         try {
             JSONObject body = new JSONObject();
             String walletId = PreferencesUtil.getWalletId();
@@ -203,6 +207,26 @@ public class QRPayActivity extends BaseAppCompatActivity {
                 public void onResponse(Call call, Response response) throws IOException {
                     String responseBody = response.body().string();
                     Log.d(TAG, "[" + response.code() + "] " + responseBody);
+                    if (response.code() == 401 && !isRetry) {
+                        // Stored key is expired — fetch a fresh one and retry once.
+                        runOnUiThread(() -> {
+                            if (isFinishing()) return;
+                            tvLoadingStatus.setText(R.string.qr_pay_status_preparing);
+                            ApiKeyManager.get().fetch(
+                                () -> {
+                                    if (isFinishing()) return;
+                                    tvLoadingStatus.setText(R.string.qr_pay_status_generating);
+                                    generateQR(amountFils, amountDisplayAed, requestId, true);
+                                },
+                                errorMsg -> {
+                                    if (isFinishing()) return;
+                                    showInputState();
+                                    showToast(errorMsg);
+                                }
+                            );
+                        });
+                        return;
+                    }
                     if (!response.isSuccessful()) {
                         runOnUiThread(() -> {
                             showInputState();

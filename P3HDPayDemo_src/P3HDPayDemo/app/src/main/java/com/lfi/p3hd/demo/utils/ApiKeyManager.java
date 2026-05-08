@@ -80,19 +80,10 @@ public class ApiKeyManager {
             return;
         }
 
-        // Seed build-time key for environments that ship with one (e.g. staging).
-        String defaultKey = QRConfig.getDefaultApiKey();
-        if (!defaultKey.isEmpty()) {
-            PreferencesUtil.setLfiApiKey(defaultKey);
-            state = State.READY;
-            mainHandler.post(onReady::onReady);
-            return;
-        }
-
         if (state == State.FAILED) {
-            String msg = lastError.isEmpty() ? "Failed to connect to payment gateway" : lastError;
-            mainHandler.post(() -> onError.onError(msg));
-            return;
+            // Reset and retry — don't cache failure across user-initiated taps.
+            state = State.IDLE;
+            lastError = "";
         }
 
         pendingReady.add(onReady);
