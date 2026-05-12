@@ -76,6 +76,7 @@
     <string name="nfc_pay_title">NFC Payment</string>
     <string name="nfc_pay_instruction">Tap your phone to this device</string>
     <string name="nfc_pay_subtitle">Hold customer&#8217;s phone near the screen</string>
+    <string name="nfc_pay_status_generating">Generating NFC payment code\u2026</string>
 
     <!-- HCE -->
     <string name="hce_title">HCE Emulate</string>
@@ -119,6 +120,8 @@
     <string name="setting_wallet_id_title">Enter Wallet ID</string>
     <string name="setting_nfc_wallet_id_label">NFC Wallet ID</string>
     <string name="setting_nfc_wallet_id_title">Enter NFC Wallet ID</string>
+    <string name="setting_nfc_wallet_type_label">NFC Wallet Type</string>
+    <string name="setting_nfc_wallet_type_title">Select NFC Wallet Type</string>
     <string name="setting_nfc_merchant_name_label">NFC Merchant Name</string>
     <string name="setting_nfc_merchant_name_title">Enter Merchant Name</string>
 

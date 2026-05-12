@@ -19,6 +19,7 @@ public class SettingActivity extends BaseAppCompatActivity {
     private TextView tvApiKeyValue;
     private TextView tvWalletIdValue;
     private TextView tvNfcWalletIdValue;
+    private TextView tvNfcWalletTypeValue;
     private TextView tvNfcMerchantNameValue;
 
     @Override
@@ -33,7 +34,8 @@ public class SettingActivity extends BaseAppCompatActivity {
         tvEnvValue            = findViewById(R.id.tv_env_value);
         tvApiKeyValue         = findViewById(R.id.tv_api_key_value);
         tvWalletIdValue       = findViewById(R.id.tv_wallet_id_value);
-        tvNfcWalletIdValue    = findViewById(R.id.tv_nfc_wallet_id_value);
+        tvNfcWalletIdValue     = findViewById(R.id.tv_nfc_wallet_id_value);
+        tvNfcWalletTypeValue   = findViewById(R.id.tv_nfc_wallet_type_value);
         tvNfcMerchantNameValue = findViewById(R.id.tv_nfc_merchant_name_value);
 
         updateDisplay();
@@ -41,6 +43,7 @@ public class SettingActivity extends BaseAppCompatActivity {
         findViewById(R.id.btn_change_env).setOnClickListener(v -> showEnvPicker());
         findViewById(R.id.btn_refresh_key).setOnClickListener(v -> fetchApiKey());
         findViewById(R.id.btn_edit_nfc_wallet).setOnClickListener(v -> showNfcWalletIdInput());
+        findViewById(R.id.btn_edit_nfc_wallet_type).setOnClickListener(v -> showNfcWalletTypePicker());
         findViewById(R.id.btn_edit_nfc_merchant).setOnClickListener(v -> showNfcMerchantNameInput());
     }
 
@@ -52,6 +55,8 @@ public class SettingActivity extends BaseAppCompatActivity {
         tvWalletIdValue.setText(walletId.isEmpty() ? QRConfig.getDefaultWalletId() + " (default)" : walletId);
         String nfcWalletId = PreferencesUtil.getNfcWalletId();
         tvNfcWalletIdValue.setText(nfcWalletId.isEmpty() ? QRConfig.getDefaultWalletId() + " (default)" : nfcWalletId);
+        String nfcWalletType = PreferencesUtil.getNfcWalletType();
+        tvNfcWalletTypeValue.setText(nfcWalletType);
         String nfcMerchantName = PreferencesUtil.getNfcMerchantName();
         tvNfcMerchantNameValue.setText(nfcMerchantName.isEmpty() ? "CBDC Merchant (default)" : nfcMerchantName);
     }
@@ -112,6 +117,26 @@ public class SettingActivity extends BaseAppCompatActivity {
             .setPositiveButton(android.R.string.ok, (d, w) -> {
                 String value = input.getText().toString().trim();
                 PreferencesUtil.setNfcWalletId(value.isEmpty() ? envDefault : value);
+                updateDisplay();
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
+    private void showNfcWalletTypePicker() {
+        String[] types = {"MERCHANT_COLLECTION", "MICRO_MERCHANT"};
+        String current = PreferencesUtil.getNfcWalletType();
+        int currentIdx = 0;
+        for (int i = 0; i < types.length; i++) {
+            if (types[i].equals(current)) { currentIdx = i; break; }
+        }
+        final int[] selected = {currentIdx};
+
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.setting_nfc_wallet_type_title)
+            .setSingleChoiceItems(types, currentIdx, (d, which) -> selected[0] = which)
+            .setPositiveButton(android.R.string.ok, (d, w) -> {
+                PreferencesUtil.setNfcWalletType(types[selected[0]]);
                 updateDisplay();
             })
             .setNegativeButton(android.R.string.cancel, null)

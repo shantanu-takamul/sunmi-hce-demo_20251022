@@ -12,7 +12,8 @@ public class PreferencesUtil {
     private static final String KEY_WALLET_ID = "wallet_id";
     private static final String KEY_LFI_API_KEY = "lfi_api_key";
     private static final String KEY_LFI_API_KEY_EXPIRY = "lfi_api_key_expiry";
-    private static final String KEY_NFC_WALLET_ID = "nfc_wallet_id";
+    private static final String KEY_NFC_WALLET_ID    = "nfc_wallet_id";
+    private static final String KEY_NFC_WALLET_TYPE  = "nfc_wallet_type";
     private static final String KEY_NFC_MERCHANT_NAME = "nfc_merchant_name";
 
     private static SharedPreferences prefs() {
@@ -57,6 +58,14 @@ public class PreferencesUtil {
 
     public static void setNfcWalletId(String walletId) {
         prefs().edit().putString(KEY_NFC_WALLET_ID, walletId).apply();
+    }
+
+    public static String getNfcWalletType() {
+        return prefs().getString(KEY_NFC_WALLET_TYPE, "MERCHANT_COLLECTION");
+    }
+
+    public static void setNfcWalletType(String walletType) {
+        prefs().edit().putString(KEY_NFC_WALLET_TYPE, walletType).apply();
     }
 
     public static String getNfcMerchantName() {
