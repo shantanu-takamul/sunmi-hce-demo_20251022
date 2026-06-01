@@ -70,7 +70,17 @@
         android:textColor="@color/text_tertiary"
         android:textSize="12sp" />
 
-    <!-- Refunded badge (shown when hasRefunds=true) -->
+    <!-- Transaction type label (e.g. PAY_TO_MERCHANT, MERCHANT_REFUND) -->
+    <TextView
+        android:id="@+id/tv_tx_type"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:fontFamily="monospace"
+        android:textColor="@color/text_tertiary"
+        android:textSize="10sp" />
+
+    <!-- Refunded badge (shown when hasSuccessRefund=true) -->
     <TextView
         android:id="@+id/tv_refunded_badge"
         android:layout_width="wrap_content"
@@ -84,6 +94,23 @@
         android:text="@string/tx_already_refunded"
         android:textColor="@color/text_secondary"
         android:textSize="11sp"
+        android:visibility="gone" />
+
+    <!-- Refund Pending badge (shown when hasPendingRefund=true and not yet succeeded) -->
+    <TextView
+        android:id="@+id/tv_refund_pending_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:paddingStart="8dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="2dp"
+        android:background="@color/warning_soft"
+        android:text="@string/tx_refund_pending"
+        android:textColor="@color/warning"
+        android:textSize="11sp"
+        android:textStyle="bold"
         android:visibility="gone" />
 
     <!-- Row 4: Action buttons -->

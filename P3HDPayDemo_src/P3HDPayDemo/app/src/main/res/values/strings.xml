@@ -136,6 +136,7 @@
     <string name="tx_view">View Details</string>
     <string name="tx_refund">Refund</string>
     <string name="tx_already_refunded">Refunded</string>
+    <string name="tx_refund_pending">Refund Pending</string>
 
     <!-- Navigation -->
     <string name="back">Back</string>

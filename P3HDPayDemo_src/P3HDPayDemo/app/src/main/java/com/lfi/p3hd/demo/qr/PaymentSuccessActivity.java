@@ -41,6 +41,11 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
     public static final String EXTRA_EMV_PAYLOAD = "emvPayload";  // kept for caller compatibility
 
     private static final int PAPER_WIDTH_DOTS = 384;
+    // Thermal printer: first printPointLine → physical BOTTOM, last → physical TOP.
+    // So blank rows printed first become the bottom gap, and printFeedPaper at the end
+    // becomes the top margin (gap between tear edge and first content line).
+    private static final int PRINT_BOTTOM_GAP_LINES = 80;  // blank rows printed first → bottom of receipt
+    private static final int PRINT_TOP_FEED_LINES    = 120; // printFeedPaper at end → top margin above content
     private static final long MIN_PRINT_ANIMATION_MS = 4200L;
     private static final long MAX_PRINT_ANIMATION_MS = 8500L;
 
@@ -288,7 +293,7 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
         returnButton.setEnabled(false);
         layoutPrintedSuccess.setVisibility(View.GONE);
 
-        startReceiptPrintAnimation(receiptBitmap.getHeight());
+        startReceiptPrintAnimation(PRINT_BOTTOM_GAP_LINES + receiptBitmap.getHeight());
         new Thread(() -> printReceiptBitmap(receiptBitmap)).start();
     }
 
@@ -383,7 +388,18 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
 
             try {
                 byte[] rowData = new byte[PAPER_WIDTH_DOTS / 8];
-                for (int y = 0; y < receiptBmp.getHeight(); y++) {
+
+                // Bottom gap: blank rows printed first → appear at physical bottom of receipt.
+                java.util.Arrays.fill(rowData, (byte) 0);
+                for (int i = 0; i < PRINT_BOTTOM_GAP_LINES; i++) {
+                    printer.printPointLine(rowData);
+                }
+
+                // Print bitmap in REVERSE row order.
+                // On this thermal printer, the first printPointLine call ends up at the physical
+                // bottom of the receipt (paper feeds upward). Printing y=height-1 first ensures
+                // the receipt title ends up at the physical top and the footer at the bottom.
+                for (int y = receiptBmp.getHeight() - 1; y >= 0; y--) {
                     for (int byteIdx = 0; byteIdx < rowData.length; byteIdx++) {
                         byte b = 0;
                         for (int bit = 0; bit < 8; bit++) {
@@ -396,7 +412,10 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
                     }
                     printer.printPointLine(rowData);
                 }
-                printer.printFeedPaper(60);
+
+                // Top margin: feed paper so the receipt title clears the tear bar.
+                // printFeedPaper at the end → blank space at physical top of the receipt.
+                printer.printFeedPaper(PRINT_TOP_FEED_LINES);
                 printed = true;
             } finally {
                 printer.printClose();

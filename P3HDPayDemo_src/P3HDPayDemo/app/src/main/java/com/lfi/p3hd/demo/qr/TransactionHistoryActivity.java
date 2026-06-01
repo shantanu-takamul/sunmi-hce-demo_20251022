@@ -24,9 +24,14 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -44,6 +49,69 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
     private View layoutLoading;
     private View layoutEmpty;
     private final OkHttpClient httpClient = new OkHttpClient();
+
+    // GAP 5: one idempotency key per original transaction ID, reused on retry to prevent double-refund
+    private final Map<String, String> idempotencyKeys = new HashMap<>();
+
+    // Tracks transactions where a refund is in-flight (CONCURRENT_REQUEST / KEY_CONFLICT)
+    // so the UI can show "Refund Pending" badge even before the history API reflects it.
+    private final Set<String> pendingRefunds = Collections.synchronizedSet(new HashSet<>());
+
+    private String getOrCreateIdempotencyKey(String txId) {
+        return idempotencyKeys.computeIfAbsent(txId, k -> UUID.randomUUID().toString());
+    }
+
+    /** Maps raw server error codes and fields to a single human-readable string. */
+    private String friendlyError(JSONObject json, int httpCode) {
+        String errorCode    = json.optString("errorCode", "");
+        String message      = json.optString("message", "");
+        String failureCode  = json.optString("failureCode", "");
+        String failureReason = json.optString("failureReason", "");
+        JSONObject details  = json.optJSONObject("details");
+
+        switch (errorCode) {
+            case "IDEMPOTENCY_KEY_CONFLICT":
+                return "A refund has already been queued for this transaction — refresh to see the status.";
+            case "IDEMPOTENCY_CONCURRENT_REQUEST":
+                return "A refund is already in progress — refresh the list in a moment to see the outcome.";
+            case "CANCEL_WINDOW_EXPIRED":
+                return "Cancel window expired — voids are only allowed within 60 minutes of the original payment.";
+            case "VALIDATION_ERROR":
+                if (details != null && details.length() > 0) {
+                    return "Validation error: " + details.toString();
+                }
+                return "Validation error — check refund details and try again.";
+            case "TRANSACTION_NOT_FOUND":
+                return "Transaction not found on the server.";
+            case "REFUND_NOT_ALLOWED":
+                return "Refund is not allowed for this transaction type.";
+            case "INSUFFICIENT_FUNDS":
+                return "Insufficient funds in the merchant wallet to process refund.";
+            case "SANCTIONS_SCREENING_FAILED":
+                return "Refund blocked — sanctions screening did not pass.";
+            case "AUTH_TOKEN_MISSING":
+                return "API key missing — go to Settings to configure it.";
+            case "AUTH_TOKEN_INVALID":
+                return "API key invalid or expired — go to Settings to refresh it.";
+            case "DATE_RANGE_TOO_WIDE":
+                return "Date range too wide — maximum allowed is 90 days.";
+            default:
+                if (!failureReason.isEmpty()) return failureReason;
+                if (!failureCode.isEmpty())   return failureCode;
+                if (!message.isEmpty())       return message;
+                return "Unexpected error (HTTP " + httpCode + ")";
+        }
+    }
+
+    /** Carries both the user-facing message and whether the refund is now in a pending state. */
+    private static class RefundResult {
+        final String  message;
+        final boolean isPending;   // true → show "Refund Pending" badge on this transaction
+        RefundResult(String message, boolean isPending) {
+            this.message   = message;
+            this.isPending = isPending;
+        }
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -134,11 +202,32 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             tx.payeeWalletId     = obj.optString("payeeWalletId", "");
             tx.amountFils        = obj.optLong("amount", 0);
             tx.currency          = obj.optString("currency", QRConfig.CURRENCY);
-            tx.requestId         = obj.optString("requestId", "");
-            tx.createdAt         = obj.optString("createdAt", "");
+            tx.requestId              = obj.optString("requestId", "");
+            tx.createdAt              = obj.optString("createdAt", "");
+            tx.originalTransactionId  = obj.optString("originalTransactionId", ""); // GAP 6
+            tx.reference              = obj.optString("reference", "");             // GAP 6
+            tx.updatedAt              = obj.optString("updatedAt", "");             // GAP 6
+            tx.failureCode            = obj.optString("failureCode", "");           // GAP 6
+            tx.failureReason          = obj.optString("failureReason", "");         // GAP 6
 
+            // GAP 2: classify each refund entry — SUCCESS blocks retry; FAILED allows retry;
+            // anything else (PENDING / SCREENING_*) marks the transaction as "refund in progress"
             JSONArray refunds = obj.optJSONArray("refunds");
             tx.hasRefunds = refunds != null && refunds.length() > 0;
+            if (refunds != null) {
+                for (int j = 0; j < refunds.length(); j++) {
+                    JSONObject r = refunds.optJSONObject(j);
+                    if (r == null) continue;
+                    String refundStatus = r.optString("refundStatus", "");
+                    if ("SUCCESS".equals(refundStatus)) {
+                        tx.hasSuccessRefund = true;
+                        tx.refundTxId = r.optString("refundTransactionId", "");
+                    } else if (!"FAILED".equals(refundStatus) && !refundStatus.isEmpty()) {
+                        // PENDING, SCREENING_REQUESTED, CBDC_PENDING, etc. — in progress
+                        tx.hasPendingRefund = true;
+                    }
+                }
+            }
 
             list.add(tx);
         }
@@ -151,6 +240,17 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             layoutEmpty.setVisibility(View.VISIBLE);
             listTransactions.setVisibility(View.GONE);
             return;
+        }
+        // Apply in-session pending state: if postRefund returned CONCURRENT or CONFLICT this
+        // session, mark the transaction pending even if the history API doesn't reflect it yet.
+        for (Transaction tx : transactions) {
+            if (pendingRefunds.contains(tx.transactionId) && !tx.hasSuccessRefund) {
+                tx.hasPendingRefund = true;
+            }
+            // Once the API shows a success refund, remove from pending set — it's settled.
+            if (tx.hasSuccessRefund) {
+                pendingRefunds.remove(tx.transactionId);
+            }
         }
         layoutEmpty.setVisibility(View.GONE);
         listTransactions.setVisibility(View.VISIBLE);
@@ -169,7 +269,10 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
                 + "\nPayee: " + (txn.payeeWalletId.isEmpty() ? "—" : txn.payeeWalletId)
                 + "\nDate: " + (date.isEmpty() ? "—" : date)
                 + (txn.requestId.isEmpty() ? "" : "\nRequest ID:\n" + txn.requestId)
-                + (txn.hasRefunds ? "\n\n[Already refunded]" : "");
+                + (txn.reference.isEmpty() ? "" : "\nReference: " + txn.reference)
+                + (txn.failureCode.isEmpty() ? "" : "\nFailure Code: " + txn.failureCode)
+                + (txn.failureReason.isEmpty() ? "" : "\nFailure Reason: " + txn.failureReason)
+                + (txn.hasSuccessRefund ? "\n\nRefunded — ID:\n" + txn.refundTxId : "");
 
         new AlertDialog.Builder(this)
                 .setTitle("Transaction Details")
@@ -179,8 +282,12 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
     }
 
     private void showRefundDialog(Transaction txn) {
-        if (txn.hasRefunds) {
+        if (txn.hasSuccessRefund) {
             showToast("This transaction has already been refunded");
+            return;
+        }
+        if (txn.hasPendingRefund) {
+            showToast("A refund is already in progress — refresh to check the status");
             return;
         }
         if (!"SUCCESS".equals(txn.transactionStatus)) {
@@ -212,32 +319,36 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
         showToast("Processing refund…");
         new Thread(() -> {
             try {
-                String result = postRefund(txn);
+                RefundResult result = postRefund(txn);
                 if (!isFinishing()) {
                     runOnUiThread(() -> {
-                        showToast(result);
+                        if (result.isPending) pendingRefunds.add(txn.transactionId);
+                        showToast(result.message);
                         loadTransactions();
                     });
                 }
             } catch (SocketTimeoutException e) {
                 // Sanctions screening can outlast OkHttp's read window even at 90 s.
-                // The server may still complete the refund — do not retry automatically.
+                // Mark pending so the badge appears immediately; server may still complete.
                 Log.e(TAG, "executeRefund timed out", e);
                 if (!isFinishing()) {
-                    runOnUiThread(() -> showToast(
-                            "Refund is taking longer than expected. " +
-                            "Refresh the list in a moment — it may still complete."));
+                    runOnUiThread(() -> {
+                        pendingRefunds.add(txn.transactionId);
+                        showToast("Refund is taking longer than expected — " +
+                                "it's queued on the server. Refresh to check the status.");
+                        loadTransactions();
+                    });
                 }
             } catch (Exception e) {
                 Log.e(TAG, "executeRefund failed", e);
                 if (!isFinishing()) {
-                    runOnUiThread(() -> showToast("Refund failed: " + e.getMessage()));
+                    runOnUiThread(() -> showToast(e.getMessage()));
                 }
             }
         }).start();
     }
 
-    private String postRefund(Transaction txn) throws Exception {
+    private RefundResult postRefund(Transaction txn) throws Exception {
         String url = QRConfig.getBaseUrl() + QRConfig.RETURN_ENDPOINT + txn.transactionId;
 
         JSONObject body = new JSONObject();
@@ -254,7 +365,8 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
                 .url(url)
                 .addHeader("X-LFI-ID", QRConfig.getXLfiId())
                 .addHeader("Content-Type", "application/json")
-                .addHeader("X-Idempotency-Key", UUID.randomUUID().toString())
+                // GAP 5: reuse the same key on retry so server deduplicates and prevents double-refund
+                .addHeader("X-Idempotency-Key", getOrCreateIdempotencyKey(txn.transactionId))
                 .post(RequestBody.create(MediaType.parse("application/json"), body.toString()));
 
         String apiKey = PreferencesUtil.getLfiApiKey();
@@ -271,28 +383,44 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             String responseBody = response.body() == null ? "" : response.body().string();
             Log.d(TAG, "postRefund [" + response.code() + "]: " + responseBody);
 
-            JSONObject json = new JSONObject(responseBody);
-
-            // 409 means the server already has a live or completed request for this transactionId
+            JSONObject json = responseBody.isEmpty() ? new JSONObject() : new JSONObject(responseBody);
             String errorCode = json.optString("errorCode", "");
-            if ("IDEMPOTENCY_CONCURRENT_REQUEST".equals(errorCode)) {
-                return "A refund is already in progress for this transaction. " +
-                       "Refresh the list in a moment to see the outcome.";
+
+            // In-flight / queued: mark as pending so the badge appears immediately
+            if ("IDEMPOTENCY_CONCURRENT_REQUEST".equals(errorCode)
+                    || "IDEMPOTENCY_KEY_CONFLICT".equals(errorCode)) {
+                return new RefundResult(friendlyError(json, response.code()), true);
             }
 
-            String status  = json.optString("status", "");
-            String message = json.optString("message", "");
+            // Any other non-success error code → human-readable failure, allow retry
+            if (!errorCode.isEmpty() && !response.isSuccessful()) {
+                throw new Exception(friendlyError(json, response.code()));
+            }
+
+            String status     = json.optString("status", "");
+            // GAP 3: capture the new refund transaction ID for reference
+            String refundTxId = json.optString("transactionId", "");
 
             if ("SUCCESS".equals(status)) {
-                return "Refund successful";
-            } else if (!response.isSuccessful()) {
-                throw new Exception("HTTP " + response.code()
-                        + (message.isEmpty() ? "" : ": " + message));
-            } else if (!message.isEmpty()) {
-                return "Refund " + status + ": " + message;
-            } else {
-                return "Refund status: " + (status.isEmpty() ? "HTTP " + response.code() : status);
+                // GAP 5: clear the stored key — this transaction is fully settled
+                idempotencyKeys.remove(txn.transactionId);
+                pendingRefunds.remove(txn.transactionId);
+                String idSuffix = refundTxId.length() > 8
+                        ? "…" + refundTxId.substring(refundTxId.length() - 8)
+                        : refundTxId;
+                return new RefundResult(
+                        "Refund successful" + (idSuffix.isEmpty() ? "" : "\nRefund ID: " + idSuffix),
+                        false);
             }
+
+            if ("FAILED".equals(status)) {
+                throw new Exception(friendlyError(json, response.code()));
+            }
+
+            // Intermediate status (PENDING, SCREENING_*) — mark as pending
+            return new RefundResult(
+                    "Refund submitted — status: " + status + ". Refresh to see the outcome.",
+                    true);
         }
     }
 
@@ -307,16 +435,27 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
     // --- Data model ---
 
     static class Transaction {
-        String transactionId     = "";
-        String transactionType   = "";
-        String transactionStatus = "";
-        String payerWalletId     = "";
-        String payeeWalletId     = "";
-        long   amountFils        = 0;
-        String currency          = "AED";
-        String requestId         = "";
-        String createdAt         = "";
-        boolean hasRefunds       = false;
+        String transactionId         = "";
+        String transactionType       = "";
+        String transactionStatus     = "";
+        String payerWalletId         = "";
+        String payeeWalletId         = "";
+        long   amountFils            = 0;
+        String currency              = "AED";
+        String requestId             = "";
+        String createdAt             = "";
+        // GAP 6: fields present in history response but previously unparsed
+        String originalTransactionId = "";
+        String reference             = "";
+        String updatedAt             = "";
+        String failureCode           = "";
+        String failureReason         = "";
+        // GAP 2: track whether any refund attempt succeeded (vs just attempted)
+        boolean hasRefunds           = false;
+        boolean hasSuccessRefund     = false;
+        boolean hasPendingRefund     = false;  // refund in-flight (screening / CBDC pending)
+        // GAP 3: refund transaction ID from a successful refund, for display/lookup
+        String  refundTxId           = "";
     }
 
     // --- List adapter ---
@@ -359,18 +498,34 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             String payer = txn.payerWalletId.isEmpty() ? "—" : txn.payerWalletId;
             ((TextView) convertView.findViewById(R.id.tv_tx_payer)).setText("From: " + payer);
 
+            // GAP 4: show type so merchant can distinguish payments from refund/cancel rows
+            ((TextView) convertView.findViewById(R.id.tv_tx_type))
+                    .setText(txn.transactionType);
+
             convertView.findViewById(R.id.btn_view)
                     .setOnClickListener(v -> showDetailDialog(txn));
 
+            // GAP 4: only PAY_TO_MERCHANT rows can be refunded; hide button for refund/cancel rows
             View btnRefund = convertView.findViewById(R.id.btn_refund);
-            boolean canRefund = "SUCCESS".equals(txn.transactionStatus) && !txn.hasRefunds;
+            boolean isMerchantPayment = "PAY_TO_MERCHANT".equals(txn.transactionType);
+            // Disable if: not a payment, not successful, already successfully refunded, or pending
+            boolean canRefund = isMerchantPayment
+                    && "SUCCESS".equals(txn.transactionStatus)
+                    && !txn.hasSuccessRefund
+                    && !txn.hasPendingRefund;
+            btnRefund.setVisibility(isMerchantPayment ? View.VISIBLE : View.GONE);
             btnRefund.setEnabled(canRefund);
             btnRefund.setAlpha(canRefund ? 1f : 0.35f);
             btnRefund.setOnClickListener(v -> showRefundDialog(txn));
 
-            // Show "Refunded" label if already refunded
+            // "Refunded" badge — only when a SUCCESS refund exists
             TextView tvRefundedBadge = convertView.findViewById(R.id.tv_refunded_badge);
-            tvRefundedBadge.setVisibility(txn.hasRefunds ? View.VISIBLE : View.GONE);
+            tvRefundedBadge.setVisibility(txn.hasSuccessRefund ? View.VISIBLE : View.GONE);
+
+            // "Refund Pending" badge — shown when refund is in-flight (sanctions screening etc.)
+            TextView tvRefundPendingBadge = convertView.findViewById(R.id.tv_refund_pending_badge);
+            tvRefundPendingBadge.setVisibility(
+                    (txn.hasPendingRefund && !txn.hasSuccessRefund) ? View.VISIBLE : View.GONE);
 
             return convertView;
         }
