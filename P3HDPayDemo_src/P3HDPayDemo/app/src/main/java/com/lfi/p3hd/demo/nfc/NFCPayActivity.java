@@ -169,7 +169,7 @@ public class NFCPayActivity extends BaseAppCompatActivity {
         ApiKeyManager.get().ensureReady(
             () -> {
                 if (isFinishing()) return;
-                showLoadingState(getString(R.string.nfc_pay_status_generating));
+                showLoadingState(getString(R.string.nfc_pay_status_generating)); 
                 generateQRAndOpenHce(false);
             },
             errorMsg -> {
