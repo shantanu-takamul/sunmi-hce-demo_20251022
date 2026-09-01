@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.lfi.p3hd.demo.MyApplication;
-import com.lfi.p3hd.demo.qr.QRConfig;
+import com.lfi.p3hd.demo.net.HttpClients;
 
 public class PreferencesUtil {
     private static final String PREF_NAME = "p3hd_pref";
@@ -27,6 +27,9 @@ public class PreferencesUtil {
 
     public static void setEnv(String env) {
         prefs().edit().putString(KEY_ENV, env).apply();
+        // Clients are cached per env and carry that env's trust configuration, so a
+        // stale one would keep talking to the old environment's rules.
+        HttpClients.invalidate();
     }
 
     public static String getWalletId() {

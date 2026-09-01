@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.nfc.NFCPayActivity;
 import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
@@ -36,7 +37,15 @@ public class QRPayActivity extends BaseAppCompatActivity {
 
     private final StringBuilder amountBuilder = new StringBuilder("0");
     private String lastRequestId;
-    private final OkHttpClient httpClient = QRConfig.newHttpClient();
+    /**
+     * The shared client for the active environment.
+     *
+     * Resolved per use rather than held in a field: a field is frozen at
+     * construction, so an environment switch never reaches it.
+     */
+    private OkHttpClient httpClient() {
+        return HttpClients.forCurrentEnv();
+    }
 
     /**
      * True from the moment a sale is confirmed until the terminal is back at the
@@ -257,7 +266,7 @@ public class QRPayActivity extends BaseAppCompatActivity {
                 reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
             }
 
-            httpClient.newCall(reqBuilder.build()).enqueue(new Callback() {
+            httpClient().newCall(reqBuilder.build()).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
                     // AC-7: a generation attempt that never reached the gateway must

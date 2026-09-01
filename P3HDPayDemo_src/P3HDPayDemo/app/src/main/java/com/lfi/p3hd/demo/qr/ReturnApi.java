@@ -2,6 +2,7 @@ package com.lfi.p3hd.demo.qr;
 
 import android.util.Log;
 
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
@@ -229,7 +230,7 @@ public final class ReturnApi {
         // A REFUND now returns as soon as validation passes, but the older
         // synchronous gateways screen inline and can take 30-60s. Keep the long
         // read window so this build stays correct against both.
-        OkHttpClient client = QRConfig.newHttpClient().newBuilder()
+        OkHttpClient client = HttpClients.forCurrentEnv().newBuilder()
                 .readTimeout(90, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build();

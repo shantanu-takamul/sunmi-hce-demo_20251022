@@ -25,6 +25,7 @@ import com.google.android.material.button.MaterialButton;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.MyApplication;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.print.ReceiptPrinter;
 import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
@@ -145,11 +146,15 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
     private boolean printAnimationCancelled;
     private ValueAnimator receiptAnimator;
 
-    // Redirects off, as everywhere else in the app: this backend sits behind
-    // Cloudflare Access and a device without WARP gets a 302 to the login page.
-    // Following it returns HTML with a 200, which then fails JSON parsing and
-    // surfaces as "no transaction details" instead of the real cause.
-    private final OkHttpClient httpClient = QRConfig.newHttpClient();
+    /**
+     * The shared client for the active environment.
+     *
+     * Resolved per use rather than held in a field: a field is frozen at
+     * construction, so an environment switch never reaches it.
+     */
+    private OkHttpClient httpClient() {
+        return HttpClients.forCurrentEnv();
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -558,7 +563,7 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
 
         int code;
         String body;
-        try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
+        try (Response response = httpClient().newCall(reqBuilder.build()).execute()) {
             code = response.code();
             body = response.body() == null ? "" : response.body().string();
             Log.d(TAG, "fetchTransactionDetails [" + code + "]: " + body);

@@ -1,5 +1,6 @@
 package com.lfi.p3hd.demo.qr;
 
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
 import org.json.JSONArray;
@@ -178,6 +179,46 @@ public class QRConfig {
     public static final String QR_STATUS_ENDPOINT = "/lfi-gateway/api/v1/transactions/history";
     public static final String RETURN_ENDPOINT    = "/lfi-gateway/api/v1/transactions/return/";
     public static final String AUTH_ENDPOINT       = "/web/api/v1/auth/login";
+
+    // -------------------------------------------------------------------------
+    // Environment classification
+    //
+    // Two properties of an environment change how the app behaves, and neither is
+    // "which URL is it". Both are asked often enough, from far enough apart, that
+    // guessing from the env string at each site is how they drift out of step.
+    // -------------------------------------------------------------------------
+
+    /**
+     * True for the CBUAE on-premise environments.
+     *
+     * These live inside the Central Bank network on
+     * {@code *.rcbdc.digitaldirham.gov.ae}, behind a TLS chain rooted at the internal
+     * {@code cbuae-CBDC-CA}. They resolve only from inside CB. What follows from it:
+     * no hardcoded operator credentials may ever be sent there (see ApiKeyManager),
+     * no Cloudflare explanation applies to their errors, and the base URL, LFI id and
+     * portal credentials are all operator-supplied rather than compiled in.
+     */
+    public static boolean isOnPrem(String env) {
+        return "bootstrap".equals(env) || "sit".equals(env);
+    }
+
+    public static boolean isOnPrem() {
+        return isOnPrem(PreferencesUtil.getEnv());
+    }
+
+    /**
+     * True when this environment sits behind Cloudflare Access.
+     *
+     * Only then does an HTML response mean "connect WARP". Saying that about a CB
+     * proxy error page sends the operator to fix something that does not exist.
+     */
+    public static boolean isCloudflareFronted(String env) {
+        return !isOnPrem(env) && !"local".equals(env);
+    }
+
+    public static boolean isCloudflareFronted() {
+        return isCloudflareFronted(PreferencesUtil.getEnv());
+    }
 
     // -------------------------------------------------------------------------
     // Per-environment values
@@ -384,17 +425,13 @@ public class QRConfig {
     /**
      * OkHttp client for gateway calls.
      *
-     * Redirects are off on purpose: every *.takamul.cc backend sits behind
-     * Cloudflare Access, and a device without WARP gets a 302 to the Access login
-     * page. Following it would return HTML with a 200, which then fails JSON
-     * parsing and looks like a malformed gateway response. Leaving the 302 intact
-     * lets the caller report the real cause. No gateway API legitimately redirects.
+     * @deprecated the name lies — this returns the shared per-environment client, it
+     *     does not build a new one. Call {@link HttpClients#forCurrentEnv()} directly;
+     *     this delegate exists so older call sites keep compiling.
      */
+    @Deprecated
     public static OkHttpClient newHttpClient() {
-        return new OkHttpClient.Builder()
-            .followRedirects(false)
-            .followSslRedirects(false)
-            .build();
+        return HttpClients.forCurrentEnv();
     }
 
     /**

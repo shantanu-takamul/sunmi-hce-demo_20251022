@@ -18,6 +18,7 @@ import androidx.annotation.Nullable;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.MyApplication;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.qr.PaymentSuccessActivity;
 import com.lfi.p3hd.demo.qr.QRConfig;
 import com.lfi.p3hd.demo.qr.QRExpiredActivity;
@@ -80,7 +81,15 @@ public class NFCPayActivity extends BaseAppCompatActivity {
 
     private CountDownTimer countDownTimer;
     private final Handler     pollHandler = new Handler(Looper.getMainLooper());
-    private final OkHttpClient httpClient = QRConfig.newHttpClient();
+    /**
+     * The shared client for the active environment.
+     *
+     * Resolved per use rather than held in a field: a field is frozen at
+     * construction, so an environment switch never reaches it.
+     */
+    private OkHttpClient httpClient() {
+        return HttpClients.forCurrentEnv();
+    }
     private boolean finished = false;
 
     private final Runnable pollRunnable = new Runnable() {
@@ -215,7 +224,7 @@ public class NFCPayActivity extends BaseAppCompatActivity {
             String apiKey = PreferencesUtil.getLfiApiKey();
             if (!apiKey.isEmpty()) reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
 
-            httpClient.newCall(reqBuilder.build()).enqueue(new Callback() {
+            httpClient().newCall(reqBuilder.build()).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
                     // AC-7: keep an attempt that never reached the gateway traceable.
@@ -380,7 +389,7 @@ public class NFCPayActivity extends BaseAppCompatActivity {
         String apiKey = PreferencesUtil.getLfiApiKey();
         if (!apiKey.isEmpty()) reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
 
-        httpClient.newCall(reqBuilder.build()).enqueue(new Callback() {
+        httpClient().newCall(reqBuilder.build()).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 Log.e(TAG, "checkPaymentStatus: request failed", e);

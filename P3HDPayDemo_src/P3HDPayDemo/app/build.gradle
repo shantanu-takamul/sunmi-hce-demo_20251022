@@ -14,6 +14,13 @@ android {
         versionName "1.0"
     }
 
+    // BuildConfig.DEBUG gates anything that must never run in a shipped APK —
+    // response-body logging, the offline TLS rig's simulator CA. AGP 8 stopped
+    // generating BuildConfig unless asked.
+    buildFeatures {
+        buildConfig true
+    }
+
     buildTypes {
         release {
             minifyEnabled false

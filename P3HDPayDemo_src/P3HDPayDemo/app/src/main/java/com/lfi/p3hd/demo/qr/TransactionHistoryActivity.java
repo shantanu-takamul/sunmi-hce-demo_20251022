@@ -16,6 +16,7 @@ import androidx.annotation.Nullable;
 
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
@@ -46,9 +47,15 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
     private ListView listTransactions;
     private View layoutLoading;
     private View layoutEmpty;
-    // Redirects off so a WARP drop surfaces as a 302 rather than an HTML 200
-    // that parses as an empty transaction list.
-    private final OkHttpClient httpClient = QRConfig.newHttpClient();
+    /**
+     * The shared client for the active environment.
+     *
+     * Resolved per use rather than held in a field: a field is frozen at
+     * construction, so an environment switch never reaches it.
+     */
+    private OkHttpClient httpClient() {
+        return HttpClients.forCurrentEnv();
+    }
 
     // GAP 5: one idempotency key per original transaction ID, reused on retry to prevent double-refund
     private final Map<String, String> idempotencyKeys = new HashMap<>();
@@ -138,7 +145,7 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
 
         int code;
         String body;
-        try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
+        try (Response response = httpClient().newCall(reqBuilder.build()).execute()) {
             code = response.code();
             body = response.body() == null ? "" : response.body().string();
             Log.d(TAG, "fetchTransactions [" + code + "]: "

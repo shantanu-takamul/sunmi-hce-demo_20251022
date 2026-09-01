@@ -4,6 +4,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.qr.QRConfig;
 
 import org.json.JSONObject;
@@ -89,8 +90,7 @@ public class ApiKeyManager {
         return INSTANCE;
     }
 
-    private final OkHttpClient httpClient = QRConfig.newHttpClient();
-    private final Handler mainHandler     = new Handler(Looper.getMainLooper());
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private State state = State.IDLE;
     private String lastError = "";
@@ -212,6 +212,19 @@ public class ApiKeyManager {
     // -------------------------------------------------------------------------
 
     /**
+     * The shared client for the active environment.
+     *
+     * This used to be a {@code final} field. On a static singleton that means the
+     * client was built at class load and never again — an environment switch in
+     * Settings changed every other caller's client and not this one, so key minting
+     * kept whatever TLS and connection configuration the very first environment had.
+     * Resolve it per call instead.
+     */
+    private OkHttpClient httpClient() {
+        return HttpClients.forCurrentEnv();
+    }
+
+    /**
      * True when the stored key is close enough to expiry to be worth renewing.
      * An unknown or unparseable expiry returns false: a key pasted in Settings
      * carries no expiry and must not trigger churn on every call.
@@ -261,7 +274,7 @@ public class ApiKeyManager {
                 .post(RequestBody.create(MediaType.parse("application/json"), body.toString()))
                 .build();
 
-            httpClient.newCall(req).enqueue(new Callback() {
+            httpClient().newCall(req).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
                     callback.onFailure("No connection to payment gateway");
@@ -303,7 +316,7 @@ public class ApiKeyManager {
                 .post(RequestBody.create(MediaType.parse("application/json"), body.toString()))
                 .build();
 
-            httpClient.newCall(req).enqueue(new Callback() {
+            httpClient().newCall(req).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
                     deliverError("No connection to payment gateway");

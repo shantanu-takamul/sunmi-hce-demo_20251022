@@ -19,6 +19,7 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
@@ -56,9 +57,15 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
     private TextView tvTimer;
     private CountDownTimer countDownTimer;
     private final Handler pollHandler = new Handler(Looper.getMainLooper());
-    // Redirects off so a WARP drop surfaces as a 302 rather than an HTML 200
-    // that parses as "no transactions" and silently stalls the poll.
-    private final OkHttpClient httpClient = QRConfig.newHttpClient();
+    /**
+     * The shared client for the active environment.
+     *
+     * Resolved per use rather than held in a field: a field is frozen at
+     * construction, so an environment switch never reaches it.
+     */
+    private OkHttpClient httpClient() {
+        return HttpClients.forCurrentEnv();
+    }
     private boolean finished = false;
     /** One key refresh per QR — guards against a refresh loop on every 5s tick. */
     private boolean keyRefreshed = false;
@@ -139,7 +146,7 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
         if (!apiKey.isEmpty()) reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
         Request request = reqBuilder.build();
 
-        httpClient.newCall(request).enqueue(new Callback() {
+        httpClient().newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 Log.e(TAG, "QRStatus: request failed", e);
