@@ -23,7 +23,11 @@ public class PreferencesUtil {
     }
 
     public static String getEnv() {
-        return prefs().getString(KEY_ENV, "qa");
+        // Default environment for a fresh install: bootstrap, so a terminal joining
+        // the CBUAE staff Wi-Fi works with zero Settings interaction (owner decision,
+        // 2026-09-01). Cloud testing selects its env once in Settings; the choice
+        // persists.
+        return prefs().getString(KEY_ENV, "bootstrap");
     }
 
     public static void setEnv(String env) {
