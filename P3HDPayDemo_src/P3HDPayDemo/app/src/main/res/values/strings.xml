@@ -149,6 +149,33 @@
     <string name="setting_nfc_merchant_name_label">NFC Merchant Name</string>
     <string name="setting_nfc_merchant_name_title">Enter Merchant Name</string>
 
+    <!-- Settings: on-premise (bootstrap / sit) section -->
+    <string name="setting_onprem_section">On-premise environment</string>
+    <string name="setting_base_url_label">Base URL</string>
+    <string name="setting_base_url_title">Gateway base URL</string>
+    <string name="setting_lfi_id_label">LFI ID (X-LFI-ID)</string>
+    <string name="setting_lfi_id_title">Acquirer LFI ID</string>
+    <string name="setting_portal_creds_label">Portal operator login</string>
+    <string name="setting_portal_creds_title">Portal operator login</string>
+    <string name="setting_portal_creds_hint">Used only to mint an API key on this environment.</string>
+    <string name="setting_portal_username_hint">username</string>
+    <string name="setting_portal_password_hint">password</string>
+    <string name="setting_portal_creds_none">Not set</string>
+    <string name="setting_portal_creds_cleared">Portal login cleared</string>
+    <string name="setting_ca_label">CA trust</string>
+    <string name="setting_ca_title">Certificate authority</string>
+    <string name="setting_ca_import">Import a CA PEM…</string>
+    <string name="setting_ca_use_bundled">Use the CA bundled in this build</string>
+    <string name="setting_ca_imported">CA imported</string>
+    <string name="setting_ca_cleared">Using the bundled CA</string>
+    <string name="setting_test_connection">Test connection</string>
+    <string name="setting_test_connection_running">Testing…</string>
+    <string name="setting_test_connection_title">Connection test</string>
+    <string name="setting_verify_key">Verify key</string>
+    <string name="setting_verify_key_running">Verifying…</string>
+    <string name="setting_verify_key_title">API key check</string>
+    <string name="setting_close">Close</string>
+
     <!-- Transaction History -->
     <string name="card_tx_history">Transactions</string>
     <string name="card_tx_history_desc">View and refund recent payments</string>

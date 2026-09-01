@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import okhttp3.OkHttpClient;
+import okhttp3.Response;
 
 public class QRConfig {
     // Non-env-specific constants
@@ -228,7 +229,19 @@ public class QRConfig {
         return getXLfiId(PreferencesUtil.getEnv());
     }
 
+    /**
+     * The acquirer the on-premise boxes are provisioned for.
+     *
+     * {@code acq-NEOPAY} rather than {@code acq-NI}: both are Flyway-seeded on
+     * bootstrap, but only NEOPAY appears in the default {@code lfi_reference_identities}
+     * list, so it is the one whose screening leg works without a platform change.
+     * Overridable in Settings — re-provisioning the box onto another acquirer should
+     * be a field edit, not a rebuild.
+     */
+    public static final String ON_PREM_LFI_ID_DEFAULT = "acq-NEOPAY";
+
     public static String getXLfiId(String env) {
+        if (isOnPrem(env))         return PreferencesUtil.getOnPremLfiId(env);
         if ("staging".equals(env)) return "acq-NEOPAY";
         if ("demo".equals(env))    return "acq-NEOPAY";
         if ("qa".equals(env) || "test".equals(env)) return "acq-NI";
@@ -322,7 +335,16 @@ public class QRConfig {
      */
     public static final String QA_TECHNICAL_WALLET_ID = "CUAECA69D6D9C7";
 
+    /**
+     * The TECHNICAL wallet of merchant "TTakamul" on the on-premise boxes.
+     *
+     * Same rules as {@link #QA_TECHNICAL_WALLET_ID} above: environment data, not a
+     * constant, and the Settings wallet-id override takes precedence at runtime.
+     */
+    public static final String ON_PREM_TECHNICAL_WALLET_ID = "CUAEB11BE4C2F2";
+
     public static String getDefaultWalletId(String env) {
+        if (isOnPrem(env))         return ON_PREM_TECHNICAL_WALLET_ID;
         if ("staging".equals(env)) return "NEOP979F8901FC";
         if ("demo".equals(env))    return "NEOP15B3159B17";
         if ("qa".equals(env) || "test".equals(env)) return QA_TECHNICAL_WALLET_ID;
@@ -435,13 +457,20 @@ public class QRConfig {
     }
 
     /**
-     * True when a response body is a Cloudflare Access / WARP gate page rather
-     * than anything the gateway produced.
+     * True when a response body is an HTML page rather than anything the gateway
+     * produced.
+     *
+     * The detection is environment-independent, and must stay that way: on every
+     * environment an HTML body means some intermediary answered instead of the
+     * backend, and in every case the JSON parse that would otherwise follow fails
+     * with a misleading message. Only the *explanation* differs by environment —
+     * see {@link #errorTextOf}. On the cloud backends it is a Cloudflare Access gate;
+     * inside CB it is the proxy's own error page.
      */
-    public static boolean looksLikeAccessGate(String responseBody) {
+    public static boolean looksLikeHtmlPage(String responseBody) {
         if (responseBody == null || responseBody.isEmpty()) return false;
         String head = responseBody.length() > 512 ? responseBody.substring(0, 512) : responseBody;
-        String lower = head.toLowerCase(Locale.US);
+        String lower = head.toLowerCase(Locale.US).trim();
         return lower.contains("warp client")
             || lower.contains("cloudflare access")
             || lower.contains("cloudflareaccess.com")
@@ -496,9 +525,40 @@ public class QRConfig {
      * which is far more useful on the POS screen than a bare status code.
      */
     public static String errorTextOf(String responseBody, int httpCode) {
-        if (looksLikeAccessGate(responseBody)) {
-            return "blocked by Cloudflare Access — connect the WARP client on this device";
+        return errorTextOf(responseBody, httpCode, null);
+    }
+
+    /** As {@link #errorTextOf(String, int)}, reading the {@code Location} of a 3xx. */
+    public static String errorTextOf(String responseBody, Response response) {
+        return errorTextOf(responseBody, response.code(), response.header("Location"));
+    }
+
+    /**
+     * Human-readable text for a failed gateway call, with the redirect target when
+     * there is one.
+     *
+     * @param location the {@code Location} header, or null
+     */
+    public static String errorTextOf(String responseBody, int httpCode, String location) {
+        // Redirects are switched off on every client, so a 3xx arrives intact rather
+        // than being followed into an HTML page that fails to parse. It always means
+        // an intermediary answered: no gateway API legitimately redirects. The target
+        // names the intermediary, which is the entire diagnosis — cloudflareaccess.com
+        // is an expired WARP session; anything else inside CB is the proxy.
+        if (httpCode >= 300 && httpCode < 400) {
+            String target = (location == null || location.isEmpty()) ? "(no Location header)" : location;
+            return "HTTP " + httpCode + " redirect to " + target
+                + " — an intermediary answered, not the gateway";
         }
+
+        if (looksLikeHtmlPage(responseBody)) {
+            if (isCloudflareFronted()) {
+                return "blocked by Cloudflare Access — connect the WARP client on this device";
+            }
+            return "gateway returned an HTML page (HTTP " + httpCode + ") instead of JSON"
+                + " — check the base URL, DNS, and the CB proxy: " + headOf(responseBody);
+        }
+
         try {
             JSONObject json = new JSONObject(responseBody);
             String msg  = json.optString("defaultMessage", json.optString("message", ""));
@@ -507,13 +567,62 @@ public class QRConfig {
                 return code.isEmpty() ? msg : msg + " (" + code + ")";
             }
         } catch (Exception ignored) {
-            // Not JSON (e.g. a Cloudflare Access redirect body) — fall through.
+            // Not JSON — fall through to the bare status code.
         }
         return "HTTP " + httpCode;
     }
 
+    /** The first line or so of a body, collapsed onto one line, for an error toast. */
+    private static String headOf(String body) {
+        if (body == null) return "";
+        String flat = body.replaceAll("\\s+", " ").trim();
+        return flat.length() > 80 ? flat.substring(0, 80) + "…" : flat;
+    }
+
+    // -------------------------------------------------------------------------
+    // Base URLs
+    //
+    // The cloud environments are compiled in and cannot be edited: they are stable,
+    // and an operator retyping one is a support call waiting to happen. The two
+    // on-premise environments are the opposite — their hosts were assigned by CB
+    // infrastructure and can be reassigned — so their defaults are only defaults.
+    // -------------------------------------------------------------------------
+
+    /**
+     * The bootstrap LFI gateway.
+     *
+     * Confirmed live: this name resolves to 10.40.44.140 on the CB corporate network.
+     * Note that {@code bootstrap-api-lfi.rcbdc.digitaldirham.gov.ae} (10.40.30.141)
+     * also exists and also serves the gateway paths; if the POS subnet is firewalled
+     * to only one of the two, change this in Settings rather than in code.
+     */
+    public static final String BOOTSTRAP_BASE_URL_DEFAULT =
+        "https://bootstrap-api.rcbdc.digitaldirham.gov.ae";
+
+    /**
+     * The SIT LFI gateway — ASSUMED, and known not to exist yet.
+     *
+     * This name is extrapolated from the bootstrap one and nothing more. Verified
+     * 2026-09-01: it is NXDOMAIN even from inside the CB corporate network, because
+     * SIT has no external ingress at all (bootstrap is the only on-prem environment
+     * currently exposed outside the cluster). Selecting env=sit today therefore fails
+     * at DNS, which the Test-connection button reports as such.
+     *
+     * When SIT ingress goes live, the correct host almost certainly differs from this
+     * guess. Fix it in Settings > Base URL — no rebuild — and then correct this
+     * constant so fresh installs get it right.
+     */
+    public static final String SIT_BASE_URL_DEFAULT =
+        "https://sit-api.rcbdc.digitaldirham.gov.ae";
+
     public static String getBaseUrl() {
-        switch (PreferencesUtil.getEnv()) {
+        return getBaseUrl(PreferencesUtil.getEnv());
+    }
+
+    public static String getBaseUrl(String env) {
+        switch (env) {
+            case "bootstrap": return PreferencesUtil.getOnPremBaseUrl(env);
+            case "sit":       return PreferencesUtil.getOnPremBaseUrl(env);
             case "dev":   return "https://mithril-dev-backend.takamul.cc";
             case "qa":
             case "test":  return "https://mithril-qa-backend.takamul.cc";
@@ -522,5 +631,60 @@ public class QRConfig {
             case "staging":
             default:      return "https://mithril-staging-backend.takamul.cc";
         }
+    }
+
+    /** The compiled-in default for an on-premise environment's base URL. */
+    public static String defaultOnPremBaseUrl(String env) {
+        return "sit".equals(env) ? SIT_BASE_URL_DEFAULT : BOOTSTRAP_BASE_URL_DEFAULT;
+    }
+
+    /**
+     * Checks a base URL an operator typed, returning null when it is usable and the
+     * reason when it is not.
+     *
+     * Every rule here exists because the failure it prevents is one an operator
+     * cannot diagnose from the screen. A trailing slash or a path produces a
+     * double-slashed or misrooted request URL that 404s from the gateway and looks
+     * like a backend fault. Plain http would be refused by the network security
+     * config as cleartext, with no explanation reaching the UI. A port is almost
+     * always someone pasting an internal address that the F5 VIP does not serve.
+     *
+     * The loopback exception is deliberate and narrow: the offline TLS rig
+     * (scripts/local-tls-rig.sh) terminates on localhost:8443, and without this the
+     * rig could only be configured by writing SharedPreferences over adb.
+     */
+    public static String validateBaseUrl(String url) {
+        if (url == null || url.trim().isEmpty()) return "Enter a URL";
+        String value = url.trim();
+
+        if (!value.startsWith("https://")) {
+            return "Must start with https:// — the terminal will not send cleartext";
+        }
+        if (value.endsWith("/")) {
+            return "Remove the trailing slash";
+        }
+
+        String hostAndPort = value.substring("https://".length());
+        if (hostAndPort.isEmpty()) return "Enter a host name";
+        if (hostAndPort.contains("/")) {
+            return "Host only — no path (the endpoint paths are added by the app)";
+        }
+        if (hostAndPort.contains("?") || hostAndPort.contains("#")) {
+            return "Host only — no query or fragment";
+        }
+
+        int colon = hostAndPort.indexOf(':');
+        if (colon >= 0) {
+            String host = hostAndPort.substring(0, colon);
+            boolean loopback = "localhost".equals(host)
+                || "127.0.0.1".equals(host)
+                || "10.0.2.2".equals(host);
+            if (!loopback) {
+                return "Remove the port — the gateway is served on 443";
+            }
+            String port = hostAndPort.substring(colon + 1);
+            if (!port.matches("\\d{1,5}")) return "Invalid port";
+        }
+        return null;
     }
 }

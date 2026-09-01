@@ -253,7 +253,7 @@ public final class ReturnApi {
             }
             throw new Exception("API key expired and could not be renewed");
         }
-        if (QRConfig.looksLikeAccessGate(responseBody)) {
+        if (QRConfig.looksLikeHtmlPage(responseBody)) {
             throw new Exception(QRConfig.errorTextOf(responseBody, code));
         }
 

@@ -306,7 +306,7 @@ public class QRPayActivity extends BaseAppCompatActivity {
                         runOnUiThread(() -> {
                             showInputState();
                             showToast(getString(R.string.qr_pay_error_network) + ": "
-                                + QRConfig.errorTextOf(responseBody, response.code()));
+                                + QRConfig.errorTextOf(responseBody, response));
                         });
                         return;
                     }
@@ -327,8 +327,8 @@ public class QRPayActivity extends BaseAppCompatActivity {
                     } catch (Exception e) {
                         // A 2xx that isn't parseable gateway JSON is almost always the
                         // Cloudflare Access page, not a malformed response.
-                        String reason = QRConfig.looksLikeAccessGate(responseBody)
-                            ? QRConfig.errorTextOf(responseBody, response.code())
+                        String reason = QRConfig.looksLikeHtmlPage(responseBody)
+                            ? QRConfig.errorTextOf(responseBody, response)
                             : getString(R.string.qr_pay_error_parse);
                         runOnUiThread(() -> {
                             showInputState();

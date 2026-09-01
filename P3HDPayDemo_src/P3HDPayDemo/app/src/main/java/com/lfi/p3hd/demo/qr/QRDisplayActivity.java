@@ -8,6 +8,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -20,6 +21,7 @@ import com.google.zxing.qrcode.QRCodeWriter;
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
 import com.lfi.p3hd.demo.net.HttpClients;
+import com.lfi.p3hd.demo.net.NetDiagnostics;
 import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
@@ -57,6 +59,22 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
     private TextView tvTimer;
     private CountDownTimer countDownTimer;
     private final Handler pollHandler = new Handler(Looper.getMainLooper());
+    private boolean finished = false;
+    /** One key refresh per QR — guards against a refresh loop on every 5s tick. */
+    private boolean keyRefreshed = false;
+
+    /**
+     * Consecutive failed polls, and the reason the last one failed.
+     *
+     * A single miss is normal — a dropped packet, a hiccup at the gateway — and
+     * putting an error on screen for it would train the operator to ignore the line.
+     * Three in a row (six seconds at POLL_INTERVAL_MS) is a real fault.
+     */
+    private int consecutivePollFailures = 0;
+    private TextView tvPollStatus;
+
+    private static final int POLL_FAILURES_BEFORE_WARNING = 3;
+
     /**
      * The shared client for the active environment.
      *
@@ -66,9 +84,6 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
     private OkHttpClient httpClient() {
         return HttpClients.forCurrentEnv();
     }
-    private boolean finished = false;
-    /** One key refresh per QR — guards against a refresh loop on every 5s tick. */
-    private boolean keyRefreshed = false;
 
     private final Runnable pollRunnable = new Runnable() {
         @Override
@@ -98,6 +113,7 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
 
     private void initView() {
         tvTimer = findViewById(R.id.tv_timer);
+        tvPollStatus = findViewById(R.id.tv_poll_status);
         TextView tvAmount = findViewById(R.id.tv_amount);
         tvAmount.setText("AED " + amountAed);
         ImageView ivQr = findViewById(R.id.iv_qr_code);
@@ -150,12 +166,14 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
             @Override
             public void onFailure(Call call, IOException e) {
                 Log.e(TAG, "QRStatus: request failed", e);
+                notePollFailure(NetDiagnostics.classify(e));
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 String responseBody = response.body().string();
                 if (response.code() == 401) {
+                    notePollFailure(NetDiagnostics.classifyHttp(401));
                     // The key died mid-QR. Without this the countdown keeps
                     // running while polling never succeeds again, so the QR
                     // looks alive but can never report payment.
@@ -169,9 +187,22 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
                     }
                     return;   // next tick retries with whatever key is stored
                 }
+                if (!response.isSuccessful()) {
+                    notePollFailure(QRConfig.looksLikeHtmlPage(responseBody)
+                        ? QRConfig.errorTextOf(responseBody, response)
+                        : NetDiagnostics.classifyHttp(response.code()));
+                    return;
+                }
+
                 try {
                     JSONObject json = new JSONObject(responseBody);
                     JSONArray transactions = json.optJSONArray("transactions");
+
+                    // Reaching here means the gateway answered with parseable JSON,
+                    // which is the definition of a healthy poll. An empty list is a
+                    // customer who has not paid yet, not a fault.
+                    notePollSuccess();
+
                     if (transactions == null || transactions.length() == 0) return;
 
                     JSONObject tx = transactions.getJSONObject(0);
@@ -210,8 +241,34 @@ public class QRDisplayActivity extends BaseAppCompatActivity {
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "QRStatus: parse error", e);
+                    notePollFailure("gateway sent a response the terminal could not read");
                 }
             }
+        });
+    }
+
+    /**
+     * Records a failed poll and, once they stop looking like noise, says so on screen.
+     *
+     * Called from OkHttp's callback thread, so the UI touch is posted.
+     */
+    private void notePollFailure(String reason) {
+        consecutivePollFailures++;
+        Log.w(TAG, "QRStatus: poll failure " + consecutivePollFailures + " — " + reason);
+        if (consecutivePollFailures < POLL_FAILURES_BEFORE_WARNING) return;
+        runOnUiThread(() -> {
+            if (finished || tvPollStatus == null) return;
+            tvPollStatus.setText(reason);
+            tvPollStatus.setVisibility(View.VISIBLE);
+        });
+    }
+
+    /** Clears the warning: whatever was wrong has stopped being wrong. */
+    private void notePollSuccess() {
+        if (consecutivePollFailures == 0) return;
+        consecutivePollFailures = 0;
+        runOnUiThread(() -> {
+            if (tvPollStatus != null) tvPollStatus.setVisibility(View.GONE);
         });
     }
 

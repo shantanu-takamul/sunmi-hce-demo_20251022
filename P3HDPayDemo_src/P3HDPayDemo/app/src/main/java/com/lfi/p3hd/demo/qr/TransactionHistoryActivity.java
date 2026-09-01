@@ -145,9 +145,13 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
 
         int code;
         String body;
+        String location;
         try (Response response = httpClient().newCall(reqBuilder.build()).execute()) {
             code = response.code();
             body = response.body() == null ? "" : response.body().string();
+            // Read before the response closes: a 3xx names the intermediary that
+            // answered, which is the whole diagnosis on an unreachable gateway.
+            location = response.header("Location");
             Log.d(TAG, "fetchTransactions [" + code + "]: "
                     + body.substring(0, Math.min(300, body.length())));
         }
@@ -162,7 +166,7 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             throw new Exception("API key expired and could not be renewed");
         }
         if (code < 200 || code >= 300) {
-            throw new Exception(QRConfig.errorTextOf(body, code));
+            throw new Exception(QRConfig.errorTextOf(body, code, location));
         }
         return parseTransactions(new JSONObject(body));
     }

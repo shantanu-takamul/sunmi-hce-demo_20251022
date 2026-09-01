@@ -563,9 +563,13 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
 
         int code;
         String body;
+        String location;
         try (Response response = httpClient().newCall(reqBuilder.build()).execute()) {
             code = response.code();
             body = response.body() == null ? "" : response.body().string();
+            // Read before the response closes: a 3xx names the intermediary that
+            // answered, which is the whole diagnosis on an unreachable gateway.
+            location = response.header("Location");
             Log.d(TAG, "fetchTransactionDetails [" + code + "]: " + body);
         }
 
@@ -580,7 +584,7 @@ public class PaymentSuccessActivity extends BaseAppCompatActivity {
             throw new IOException("API key expired and could not be renewed");
         }
         if (code < 200 || code >= 300) {
-            throw new IOException(QRConfig.errorTextOf(body, code));
+            throw new IOException(QRConfig.errorTextOf(body, code, location));
         }
 
         JSONObject tx = extractTransaction(new JSONObject(body));
