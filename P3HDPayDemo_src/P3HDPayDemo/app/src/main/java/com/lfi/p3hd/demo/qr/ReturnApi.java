@@ -173,7 +173,18 @@ public final class ReturnApi {
     }
 
     private static Result execute(Call call, boolean isRetry) throws Exception {
-        String url = QRConfig.getBaseUrl() + QRConfig.RETURN_ENDPOINT + call.transactionId;
+        // The path segment is the RETURN's OWN id, and the gateway keys idempotency on
+        // it (@Idempotent PATH_VARIABLE): it must be a fresh id, distinct from the sale.
+        // The original transaction id belongs only in the body's originalTransactionId.
+        // Reusing the sale's id in the path mints the refund against an id that already
+        // exists and the return is rejected — the failure seen on 2026-09-01. The fresh
+        // id is call.idempotencyKey (both callers generate one and hold it stable across
+        // the 401 retry, so the retry replays the same refund rather than issuing a
+        // second one); a defensive fallback covers a caller that left it unset.
+        String returnId = !call.idempotencyKey.isEmpty()
+                ? call.idempotencyKey
+                : java.util.UUID.randomUUID().toString();
+        String url = QRConfig.getBaseUrl() + QRConfig.RETURN_ENDPOINT + returnId;
 
         JSONObject body = new JSONObject();
         body.put("messageTypeId", QRConfig.RETURN_MESSAGE_TYPE_ID);
