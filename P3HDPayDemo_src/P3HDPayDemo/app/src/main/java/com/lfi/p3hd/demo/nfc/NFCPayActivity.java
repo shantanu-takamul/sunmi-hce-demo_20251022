@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
@@ -63,21 +64,14 @@ import okhttp3.Response;
 public class NFCPayActivity extends BaseAppCompatActivity {
     public static final String EXTRA_AMOUNT_AED = "amountAed";
 
-    private static final String DDWALLET_SCHEME       = "ddwallet";
-    private static final String DDWALLET_HOST         = "nfc";
-    private static final String PARAM_WALLET_ID       = "walletId";
-    private static final String PARAM_MERCHANT_NAME   = "merchantName";
-    private static final String PARAM_WALLET_TYPE     = "walletType";
-    private static final String PARAM_AMOUNT          = "amount";
-    private static final String PARAM_REQUEST_ID      = "requestId";
-    private static final String PARAM_QR_CODE_ID      = "qrCodeId";
-    private static final String PARAM_EMV_PAYLOAD     = "emvPayload";
-    private static final String DEFAULT_MERCHANT_NAME  = "CBDC Merchant";
-    private static final String DEFAULT_WALLET_TYPE    = "MERCHANT_COLLECTION";
+    private static final String DDWALLET_SCHEME   = "ddwallet";
+    private static final String DDWALLET_HOST     = "nfc";
+    private static final String PARAM_EMV_PAYLOAD = "emvPayload";
 
     private String amountAed;
     private long   amountFils;
     private String requestId;   // generated once in onCreate, reused on 401 retry
+    private long   ttlMs = QRConfig.QR_TIMEOUT_MS;  // replaced by the gateway's own window
 
     private View     layoutLoading;
     private View     layoutReady;
@@ -86,7 +80,7 @@ public class NFCPayActivity extends BaseAppCompatActivity {
 
     private CountDownTimer countDownTimer;
     private final Handler     pollHandler = new Handler(Looper.getMainLooper());
-    private final OkHttpClient httpClient = new OkHttpClient();
+    private final OkHttpClient httpClient = QRConfig.newHttpClient();
     private boolean finished = false;
 
     private final Runnable pollRunnable = new Runnable() {
@@ -198,18 +192,14 @@ public class NFCPayActivity extends BaseAppCompatActivity {
             if (walletId.isEmpty()) walletId = QRConfig.getDefaultWalletId();
             final String resolvedWalletId = walletId;
 
-            String merchantName = PreferencesUtil.getNfcMerchantName();
-            if (merchantName.isEmpty()) merchantName = DEFAULT_MERCHANT_NAME;
-
-            String walletType = PreferencesUtil.getNfcWalletType();
-            if (walletType.isEmpty()) walletType = DEFAULT_WALLET_TYPE;
-            final String resolvedWalletType = walletType;
-            final String resolvedMerchantName = merchantName;
-
             JSONObject body = new JSONObject();
+            body.put("messageTypeId",         QRConfig.QR_MESSAGE_TYPE_ID);
             body.put("qrType",                QRConfig.QR_TYPE);
             body.put("walletId",              resolvedWalletId);
             body.put("amount",                amountFils);
+            // Stated explicitly even at zero, so the QR carries a commission split
+            // that any later refund can reverse without guessing.
+            body.put("commissionAmount",      QRConfig.QR_COMMISSION_AMOUNT);
             body.put("currency",              QRConfig.CURRENCY);
             body.put("terminalId",            QRConfig.TERMINAL_ID);
             body.put("tradingLicenseNumber",  QRConfig.TRADING_LICENSE_NUMBER);
@@ -228,6 +218,8 @@ public class NFCPayActivity extends BaseAppCompatActivity {
             httpClient.newCall(reqBuilder.build()).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
+                    // AC-7: keep an attempt that never reached the gateway traceable.
+                    Log.e(TAG, "generateQR failed, requestId=" + requestId, e);
                     runOnUiThread(() -> {
                         if (isFinishing()) return;
                         showToast(getString(R.string.qr_pay_error_network) + ": " + e.getMessage());
@@ -264,7 +256,8 @@ public class NFCPayActivity extends BaseAppCompatActivity {
                     if (!response.isSuccessful()) {
                         runOnUiThread(() -> {
                             if (isFinishing()) return;
-                            showToast(getString(R.string.qr_pay_error_network) + " (HTTP " + response.code() + ")");
+                            showToast(getString(R.string.qr_pay_error_network) + ": "
+                                + QRConfig.errorTextOf(responseBody, response.code()));
                             finish();
                         });
                         return;
@@ -272,21 +265,25 @@ public class NFCPayActivity extends BaseAppCompatActivity {
 
                     try {
                         JSONObject json = new JSONObject(responseBody);
-                        String emvPayload = json.getString("emvPayload");
-                        // qrCodeId may or may not be present depending on gateway version
-                        String qrCodeId = json.optString("qrCodeId", "");
+                        String emvPayload = QRConfig.emvFrom(json);
+                        ttlMs = QRConfig.ttlMsFrom(json);
 
                         runOnUiThread(() -> {
                             if (isFinishing()) return;
-                            openHceWithPayload(resolvedWalletId, resolvedMerchantName, resolvedWalletType, emvPayload, qrCodeId);
+                            openHceWithPayload(emvPayload);
                             showReadyState();
                             startCountdown();
                             startPolling();
                         });
                     } catch (Exception e) {
+                        // A 2xx that isn't parseable gateway JSON is almost always the
+                        // Cloudflare Access page, not a malformed response.
+                        String reason = QRConfig.looksLikeAccessGate(responseBody)
+                            ? QRConfig.errorTextOf(responseBody, response.code())
+                            : getString(R.string.qr_pay_error_parse);
                         runOnUiThread(() -> {
                             if (isFinishing()) return;
-                            showToast(getString(R.string.qr_pay_error_parse));
+                            showToast(reason);
                             finish();
                         });
                     }
@@ -304,32 +301,20 @@ public class NFCPayActivity extends BaseAppCompatActivity {
     // ─── HCE ──────────────────────────────────────────────────────────────────
 
     /**
-     * Writes the enriched ddwallet:// URI to the HCE tag.
+     * Writes the ddwallet:// URI to the HCE tag.
      *
-     * New params vs the old static URI:
-     *   &requestId=UUID        — ties this NFC tap to the QR entry on LFI Gateway
-     *   &qrCodeId=QR-ID        — present when gateway returns it; mobile uses directly
-     *   &emvPayload=...        — full EMV string; mobile calls validateQR() with this
-     *                            to resolve qrCodeId when it is absent from the URL
+     * Only emvPayload is written — the wallet app calls validateQR(emvPayload)
+     * to get walletId, merchantName, amount, walletType, and qrCodeId.
+     * URL format: ddwallet://nfc?emvPayload=<emvCode>
      */
-    private void openHceWithPayload(String walletId, String merchantName, String walletType,
-                                    String emvPayload, String qrCodeId) {
+    private void openHceWithPayload(String emvPayload) {
         try {
-            Uri.Builder uriBuilder = new Uri.Builder()
+            Uri uri = new Uri.Builder()
                 .scheme(DDWALLET_SCHEME)
                 .authority(DDWALLET_HOST)
-                .appendQueryParameter(PARAM_WALLET_ID,     walletId)
-                .appendQueryParameter(PARAM_MERCHANT_NAME, merchantName)
-                .appendQueryParameter(PARAM_WALLET_TYPE,   walletType)
-                .appendQueryParameter(PARAM_AMOUNT,        amountAed)
-                .appendQueryParameter(PARAM_REQUEST_ID,    requestId)
-                .appendQueryParameter(PARAM_EMV_PAYLOAD,   emvPayload);
+                .appendQueryParameter(PARAM_EMV_PAYLOAD, emvPayload)
+                .build();
 
-            if (!qrCodeId.isEmpty()) {
-                uriBuilder.appendQueryParameter(PARAM_QR_CODE_ID, qrCodeId);
-            }
-
-            Uri uri = uriBuilder.build();
             int cardType = AidlConstants.CardType.NFC.getValue();
             MyApplication.app.hceManagerV2.hceOpen(cardType, null);
             NdefRecord record = NdefRecord.createUri(uri);
@@ -355,7 +340,7 @@ public class NFCPayActivity extends BaseAppCompatActivity {
     // ─── Countdown ────────────────────────────────────────────────────────────
 
     private void startCountdown() {
-        countDownTimer = new CountDownTimer(QRConfig.QR_TIMEOUT_MS, 1000) {
+        countDownTimer = new CountDownTimer(ttlMs, 1000) {
             @Override
             public void onTick(long ms) {
                 long m = ms / 60_000;
@@ -417,13 +402,14 @@ public class NFCPayActivity extends BaseAppCompatActivity {
                         case "SUCCESS":
                             stopPolling();
                             if (countDownTimer != null) countDownTimer.cancel();
+                            // Same hand-off as the QR flow: carry what a void or
+                            // refund needs, stamped at the moment of detection so the
+                            // cancel window starts when the operator is told.
+                            Intent success = successIntent(tx, SystemClock.elapsedRealtime());
                             runOnUiThread(() -> {
                                 if (!finished) {
                                     finished = true;
-                                    Intent intent = new Intent(NFCPayActivity.this, PaymentSuccessActivity.class);
-                                    intent.putExtra(PaymentSuccessActivity.EXTRA_AMOUNT_AED, amountAed);
-                                    intent.putExtra(PaymentSuccessActivity.EXTRA_REQUEST_ID, requestId);
-                                    startActivity(intent);
+                                    startActivity(success);
                                     finish();
                                 }
                             });
@@ -450,5 +436,40 @@ public class NFCPayActivity extends BaseAppCompatActivity {
                 }
             }
         });
+    }
+
+    /**
+     * Builds the hand-off to the success screen from the paid transaction.
+     *
+     * Mirrors QRDisplayActivity#successIntent — the NFC flow reaches the same screen
+     * and a sale taken by tap is no less cancellable than one taken by scan.
+     *
+     * @param tx         the history record that reported SUCCESS
+     * @param nowElapsed {@link SystemClock#elapsedRealtime()} sampled at detection,
+     *                   paired with the record's createdAt to place the cancel
+     *                   deadline on the monotonic clock
+     */
+    private Intent successIntent(JSONObject tx, long nowElapsed) {
+        // The gateway's settled figure wins where it exists; otherwise the
+        // commission this QR was generated with is the only truth available.
+        long settledCommission = QRConfig.commissionFrom(tx);
+        long commission = settledCommission > 0 ? settledCommission : QRConfig.QR_COMMISSION_AMOUNT;
+
+        Intent intent = new Intent(NFCPayActivity.this, PaymentSuccessActivity.class);
+        intent.putExtra(PaymentSuccessActivity.EXTRA_AMOUNT_AED, amountAed);
+        intent.putExtra(PaymentSuccessActivity.EXTRA_REQUEST_ID, requestId);
+        intent.putExtra(PaymentSuccessActivity.EXTRA_TRANSACTION_ID,
+            tx.optString("transactionId", ""));
+        intent.putExtra(PaymentSuccessActivity.EXTRA_AMOUNT_FILS, tx.optLong("amount", 0L));
+        intent.putExtra(PaymentSuccessActivity.EXTRA_COMMISSION_FILS, commission);
+        // QA nests the wallets in movements[]; demo returns them flat. Only the older
+        // gateway still wants them on a return, but it wants them required.
+        intent.putExtra(PaymentSuccessActivity.EXTRA_PAYER_WALLET,
+            QRConfig.walletFrom(tx, "payerWalletId"));
+        intent.putExtra(PaymentSuccessActivity.EXTRA_PAYEE_WALLET,
+            QRConfig.walletFrom(tx, "payeeWalletId"));
+        intent.putExtra(PaymentSuccessActivity.EXTRA_CANCEL_DEADLINE,
+            QRConfig.cancelDeadlineElapsed(tx, nowElapsed));
+        return intent;
     }
 }

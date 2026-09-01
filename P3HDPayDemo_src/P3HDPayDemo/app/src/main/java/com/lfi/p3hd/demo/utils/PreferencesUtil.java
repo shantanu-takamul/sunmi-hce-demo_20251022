@@ -12,6 +12,7 @@ public class PreferencesUtil {
     private static final String KEY_WALLET_ID = "wallet_id";
     private static final String KEY_LFI_API_KEY = "lfi_api_key";
     private static final String KEY_LFI_API_KEY_EXPIRY = "lfi_api_key_expiry";
+    private static final String KEY_LFI_API_KEY_MANUAL = "lfi_api_key_manual";
     private static final String KEY_NFC_WALLET_ID    = "nfc_wallet_id";
     private static final String KEY_NFC_WALLET_TYPE  = "nfc_wallet_type";
     private static final String KEY_NFC_MERCHANT_NAME = "nfc_merchant_name";
@@ -21,7 +22,7 @@ public class PreferencesUtil {
     }
 
     public static String getEnv() {
-        return prefs().getString(KEY_ENV, "demo");
+        return prefs().getString(KEY_ENV, "qa");
     }
 
     public static void setEnv(String env) {
@@ -42,6 +43,19 @@ public class PreferencesUtil {
 
     public static void setLfiApiKey(String apiKey) {
         prefs().edit().putString(KEY_LFI_API_KEY, apiKey).apply();
+    }
+
+    /**
+     * True when the key was pasted in Settings rather than fetched from the portal.
+     * A manual key must never be silently replaced by the login+regen flow —
+     * on envs where the POS account cannot mint keys, it is the only working key.
+     */
+    public static boolean isLfiApiKeyManual() {
+        return prefs().getBoolean(KEY_LFI_API_KEY_MANUAL, false);
+    }
+
+    public static void setLfiApiKeyManual(boolean manual) {
+        prefs().edit().putBoolean(KEY_LFI_API_KEY_MANUAL, manual).apply();
     }
 
     public static String getLfiApiKeyExpiry() {

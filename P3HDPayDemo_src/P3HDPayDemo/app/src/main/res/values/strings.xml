@@ -26,6 +26,8 @@
     <string name="qr_pay_amount_subtitle">Enter the amount before presenting a QR or NFC payment method.</string>
     <string name="qr_pay_amount_hint">AED</string>
     <string name="qr_pay_amount_error">Please enter a valid amount greater than 0</string>
+    <string name="qr_pay_amount_below_min">Amount is below the minimum of AED %1$s</string>
+    <string name="qr_pay_amount_above_max">Amount is above the maximum of AED %1$s</string>
     <string name="qr_pay_error_network">Network error</string>
     <string name="qr_pay_error_parse">Invalid response from server</string>
     <string name="qr_pay_status_preparing">Preparing payment gateway\u2026</string>
@@ -60,6 +62,25 @@
     <string name="payment_success_payer">Payer</string>
     <string name="payment_success_terminal">Terminal</string>
     <string name="payment_success_merchant">Merchant</string>
+
+    <!-- Cancel / refund on the post-sale screen -->
+    <!-- %1$d is the seconds left in the void window -->
+    <string name="payment_success_cancel_countdown">Cancel Payment (%1$d s)</string>
+    <string name="payment_success_cancelling">Cancelling…</string>
+    <string name="payment_success_refund">Refund Payment</string>
+    <string name="payment_success_refunding">Submitting refund…</string>
+    <string name="payment_success_cancel_confirm_title">Cancel this payment?</string>
+    <string name="payment_success_refund_confirm_title">Refund this payment?</string>
+    <string name="payment_success_cancel_confirm_action">Cancel Payment</string>
+    <string name="payment_success_refund_confirm_action">Refund</string>
+    <string name="payment_success_return_dismiss">Keep Payment</string>
+    <string name="payment_success_refund_submitted">Refund submitted</string>
+    <string name="payment_success_cancel_unavailable">Already settled — cancel is no longer possible. Use Refund.</string>
+    <!-- Hero state once a cancel is confirmed -->
+    <string name="payment_cancelled_heading">Payment Cancelled</string>
+    <!-- %1$s is the amount, e.g. "AED 3.75" -->
+    <string name="payment_cancelled_subtext">%1$s was not charged. The customer\'s funds have been released.</string>
+    <string name="payment_cancelled_done">Done</string>
 
     <!-- Expired -->
     <string name="qr_expired_title">QR Expired</string>
@@ -115,6 +136,9 @@
     <string name="setting_env_title">Select Environment</string>
     <string name="setting_change">Change</string>
     <string name="setting_api_key_label">API Key</string>
+    <string name="setting_api_key_title">API Key</string>
+    <string name="setting_api_key_fetch">Fetch from portal</string>
+    <string name="setting_api_key_manual">Enter key manually</string>
     <string name="setting_refresh">Refresh</string>
     <string name="setting_wallet_id_label">QR Wallet ID</string>
     <string name="setting_wallet_id_title">Enter Wallet ID</string>
@@ -136,6 +160,7 @@
     <string name="tx_view">View Details</string>
     <string name="tx_refund">Refund</string>
     <string name="tx_already_refunded">Refunded</string>
+    <string name="tx_already_cancelled">Cancelled</string>
     <string name="tx_refund_pending">Refund Pending</string>
 
     <!-- Navigation -->

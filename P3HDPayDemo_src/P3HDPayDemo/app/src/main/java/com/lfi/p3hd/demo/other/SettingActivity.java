@@ -41,7 +41,7 @@ public class SettingActivity extends BaseAppCompatActivity {
         updateDisplay();
 
         findViewById(R.id.btn_change_env).setOnClickListener(v -> showEnvPicker());
-        findViewById(R.id.btn_refresh_key).setOnClickListener(v -> fetchApiKey());
+        findViewById(R.id.btn_refresh_key).setOnClickListener(v -> showApiKeyOptions());
         findViewById(R.id.btn_edit_nfc_wallet).setOnClickListener(v -> showNfcWalletIdInput());
         findViewById(R.id.btn_edit_nfc_wallet_type).setOnClickListener(v -> showNfcWalletTypePicker());
         findViewById(R.id.btn_edit_nfc_merchant).setOnClickListener(v -> showNfcMerchantNameInput());
@@ -161,8 +161,54 @@ public class SettingActivity extends BaseAppCompatActivity {
             .show();
     }
 
+    /**
+     * The portal path (login + inbound-api-config/regenerate) needs an operator
+     * account with LFI-admin rights. Where the POS account lacks them the call
+     * returns 403, so allow pasting a key issued from the Business Portal.
+     */
+    private void showApiKeyOptions() {
+        String[] options = {
+            getString(R.string.setting_api_key_fetch),
+            getString(R.string.setting_api_key_manual)
+        };
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.setting_api_key_title)
+            .setItems(options, (d, which) -> {
+                if (which == 0) {
+                    fetchApiKey();
+                } else {
+                    showApiKeyInput();
+                }
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
+    private void showApiKeyInput() {
+        EditText input = new EditText(this);
+        input.setHint("cbdc_...");
+        input.setText(PreferencesUtil.getLfiApiKey());
+
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.setting_api_key_manual)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok, (d, w) -> {
+                String key = input.getText().toString().trim();
+                PreferencesUtil.setLfiApiKey(key);
+                PreferencesUtil.setLfiApiKeyExpiry("");
+                PreferencesUtil.setLfiApiKeyManual(!key.isEmpty());
+                updateDisplay();
+                showToast(key.isEmpty() ? "API key cleared" : "API key saved");
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
     private void fetchApiKey() {
         showToast("Fetching API key...");
+        // Explicit operator intent to use the portal path — drop any manual key
+        // so ApiKeyManager does not refuse in order to protect it.
+        PreferencesUtil.setLfiApiKeyManual(false);
         ApiKeyManager.get().fetch(
             () -> {
                 if (isFinishing()) return;

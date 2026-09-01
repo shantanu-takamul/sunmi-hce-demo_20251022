@@ -31,6 +31,10 @@
     <color name="text_dark">#111827</color>
     <color name="white">#FFFFFF</color>
 
+    <!-- Thermal print. The head burns or it does not, so a receipt has exactly
+         these two colours; the screen's greys resolve to one of them anyway. -->
+    <color name="black">#000000</color>
+
     <!-- Dividers / borders -->
     <color name="divider">#E5EAF0</color>
 

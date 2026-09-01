@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The receipt as it goes on paper.
+
+  Same document as the card in activity_payment_success.xml — same title, amount,
+  status, rows, rules and footer, in the same order — re-laid for a 384 dot head
+  instead of a 720 px screen. It is a separate layout rather than the screen view
+  drawn into a bitmap because the screen view is 666 px wide: scaling that to 384
+  is a 0.58 factor that lands body text at about twelve dots tall, and no
+  black/white threshold recovers a legible glyph from that. Measured at the paper's
+  own width, every pixel the layout produces is a dot the head can burn.
+
+  This view is never attached to a window. ReceiptPrinter measures it at exactly
+  384 px wide with an unbounded height, so the receipt is as long as its content.
+
+  Units are px throughout — see PrintReceiptRow in styles.xml for why.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/print_receipt_root"
+    android:layout_width="384px"
+    android:layout_height="wrap_content"
+    android:background="@color/white"
+    android:orientation="vertical"
+    android:paddingStart="6px"
+    android:paddingTop="12px"
+    android:paddingEnd="6px"
+    android:paddingBottom="12px">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/payment_success_receipt_title"
+        android:textColor="@color/black"
+        android:textSize="30px"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/print_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14px"
+        android:gravity="center"
+        android:textColor="@color/black"
+        android:textSize="46px"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/print_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6px"
+        android:gravity="center"
+        android:textColor="@color/black"
+        android:textSize="24px"
+        android:textStyle="bold" />
+
+    <!--
+      2px, not the screen's 1dp of #E5EAF0. That grey is luminance 233 and the ink
+      threshold is 128, so on paper the screen's rules were simply not printed.
+    -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2px"
+        android:layout_marginTop="16px"
+        android:background="@color/black" />
+
+    <LinearLayout
+        android:id="@+id/print_row_transaction_id"
+        style="@style/PrintReceiptRow">
+
+        <TextView
+            style="@style/PrintReceiptLabel"
+            android:text="@string/payment_success_transaction_id" />
+
+        <TextView
+            android:id="@+id/print_transaction_id"
+            style="@style/PrintReceiptValue" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/print_row_request_id"
+        style="@style/PrintReceiptRow">
+
+        <TextView
+            style="@style/PrintReceiptLabel"
+            android:text="@string/payment_success_request_id" />
+
+        <TextView
+            android:id="@+id/print_request_id"
+            style="@style/PrintReceiptValue" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/print_row_date"
+        style="@style/PrintReceiptRow">
+
+        <TextView
+            style="@style/PrintReceiptLabel"
+            android:text="@string/payment_success_date" />
+
+        <TextView
+            android:id="@+id/print_date"
+            style="@style/PrintReceiptValue" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/print_row_currency"
+        style="@style/PrintReceiptRow">
+
+        <TextView
+            style="@style/PrintReceiptLabel"
+            android:text="@string/payment_success_currency" />
+
+        <TextView
+            android:id="@+id/print_currency"
+            style="@style/PrintReceiptValue" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/print_row_payer"
+        style="@style/PrintReceiptRow">
+
+        <TextView
+            style="@style/PrintReceiptLabel"
+            android:text="@string/payment_success_payer" />
+
+        <TextView
+            android:id="@+id/print_payer"
+            style="@style/PrintReceiptValue" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/print_row_terminal"
+        style="@style/PrintReceiptRow">
+
+        <TextView
+            style="@style/PrintReceiptLabel"
+            android:text="@string/payment_success_terminal" />
+
+        <TextView
+            android:id="@+id/print_terminal"
+            style="@style/PrintReceiptValue" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/print_row_merchant"
+        style="@style/PrintReceiptRow">
+
+        <TextView
+            style="@style/PrintReceiptLabel"
+            android:text="@string/payment_success_merchant" />
+
+        <TextView
+            android:id="@+id/print_merchant"
+            style="@style/PrintReceiptValue" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2px"
+        android:layout_marginTop="16px"
+        android:background="@color/black" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14px"
+        android:gravity="center"
+        android:text="@string/payment_success_receipt_footer"
+        android:textColor="@color/black"
+        android:textSize="24px" />
+</LinearLayout>
