@@ -41,12 +41,17 @@ public class PreferencesUtil {
         prefs().edit().putString(KEY_WALLET_ID, walletId).apply();
     }
 
+    /** The gateway credential. Keystore-encrypted where the device allows it. */
     public static String getLfiApiKey() {
-        return prefs().getString(KEY_LFI_API_KEY, "");
+        return SecurePrefs.getString(prefs(), KEY_LFI_API_KEY, "");
     }
 
     public static void setLfiApiKey(String apiKey) {
-        prefs().edit().putString(KEY_LFI_API_KEY, apiKey).apply();
+        if (apiKey == null || apiKey.isEmpty()) {
+            SecurePrefs.remove(prefs(), KEY_LFI_API_KEY);
+            return;
+        }
+        SecurePrefs.putString(prefs(), KEY_LFI_API_KEY, apiKey);
     }
 
     /**
@@ -160,14 +165,16 @@ public class PreferencesUtil {
     }
 
     public static String getPortalPassword(String env) {
-        return prefs().getString(envKey(env, SUFFIX_PORTAL_PASSWORD), "");
+        return SecurePrefs.getString(prefs(), envKey(env, SUFFIX_PORTAL_PASSWORD), "");
     }
 
     public static void setPortalCredentials(String env, String username, String password) {
-        prefs().edit()
-            .putString(envKey(env, SUFFIX_PORTAL_USERNAME), username)
-            .putString(envKey(env, SUFFIX_PORTAL_PASSWORD), password)
-            .apply();
+        prefs().edit().putString(envKey(env, SUFFIX_PORTAL_USERNAME), username).apply();
+        if (password == null || password.isEmpty()) {
+            SecurePrefs.remove(prefs(), envKey(env, SUFFIX_PORTAL_PASSWORD));
+        } else {
+            SecurePrefs.putString(prefs(), envKey(env, SUFFIX_PORTAL_PASSWORD), password);
+        }
     }
 
     /** True when both halves of a usable portal login are stored for this env. */
@@ -176,9 +183,7 @@ public class PreferencesUtil {
     }
 
     public static void clearPortalCredentials(String env) {
-        prefs().edit()
-            .remove(envKey(env, SUFFIX_PORTAL_USERNAME))
-            .remove(envKey(env, SUFFIX_PORTAL_PASSWORD))
-            .apply();
+        prefs().edit().remove(envKey(env, SUFFIX_PORTAL_USERNAME)).apply();
+        SecurePrefs.remove(prefs(), envKey(env, SUFFIX_PORTAL_PASSWORD));
     }
 }

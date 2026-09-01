@@ -5,6 +5,7 @@ import android.util.Log;
 
 import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.net.TrustStore;
+import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.sunmi.pay.hardware.aidlv2.print.PrinterOptV2;
 import com.sunmi.pay.hardware.aidlv2.readcard.ReadCardOptV2;
 import com.sunmi.pay.hardware.wrapper.HCEManagerV2Wrapper;
@@ -28,6 +29,11 @@ public class MyApplication extends Application {
         // operator-imported CA override lives. Without this the on-prem clients see
         // only the anchor bundled in the APK.
         HttpClients.setTrustProvider(TrustStore::operatorOverrideFor);
+        // Fetch-if-absent: an on-prem terminal handed over with portal credentials
+        // already configured should be able to take its first sale, rather than
+        // failing it and sending someone into Settings. Refuses in every other case,
+        // including when a key is already stored — see mintOnStartupIfNeeded.
+        ApiKeyManager.get().mintOnStartupIfNeeded();
         bindPaySDKService();
     }
 

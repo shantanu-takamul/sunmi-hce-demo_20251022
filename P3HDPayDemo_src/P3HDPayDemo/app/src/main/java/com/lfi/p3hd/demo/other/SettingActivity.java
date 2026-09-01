@@ -313,7 +313,10 @@ public class SettingActivity extends BaseAppCompatActivity {
         // only working credential.
         boolean wasManual = PreferencesUtil.isLfiApiKeyManual();
         PreferencesUtil.setLfiApiKeyManual(false);
+        // operatorInitiated: someone is standing here and chose this. The automatic
+        // 401-recovery path is refused on-prem precisely because nobody is.
         ApiKeyManager.get().fetch(
+            true,
             () -> {
                 if (isFinishing()) return;
                 updateDisplay();

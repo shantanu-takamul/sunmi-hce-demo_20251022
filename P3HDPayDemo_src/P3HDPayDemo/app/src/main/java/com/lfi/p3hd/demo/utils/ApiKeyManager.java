@@ -61,6 +61,16 @@ public class ApiKeyManager {
     // APK. Acceptable for a QA box behind Cloudflare Access; NOT acceptable for
     // anything a merchant can reach.
     //
+    // *** These constants are for the cloud environments ONLY. ***
+    //
+    // They must never be sent to a CBUAE on-premise box. Sending a shared,
+    // platform-wide Central Bank credential — one that ships in plaintext in every
+    // copy of this APK — to a real Central Bank server is a credential disclosure,
+    // and it would happen for no better reason than an operator changing a dropdown.
+    // credentialsFor() is the single place that decides, and it returns null rather
+    // than these values on an on-prem env; every caller treats null as "ask the
+    // operator", never as "fall back to the defaults".
+    //
     // The replacement is a realm-scoped POS user, which was verified to work on
     // QA (MSP_ADMIN in realm acq-NI can regenerate; it gets 404 on other LFIs):
     //   POST https://keycloak.takamul.cc/realms/{lfi}/protocol/openid-connect/token
@@ -69,17 +79,57 @@ public class ApiKeyManager {
     // no client secret is needed. Blocked only on a POS user being created.
     // Swapping over means replacing requestOperatorToken() and nothing else.
     // -------------------------------------------------------------------------
-    private static final String LFI_AUTH_USERNAME = "test-global-admin";
-    private static final String LFI_AUTH_PASSWORD = "12345";
-    private static final String LFI_AUTH_REALM    = "cbuae";
+    private static final String CLOUD_AUTH_USERNAME = "test-global-admin";
+    private static final String CLOUD_AUTH_PASSWORD = "12345";
+    private static final String LFI_AUTH_REALM      = "cbuae";
 
     /**
-     * The terminal owns the SECONDARY key slot; PRIMARY is left alone for the
-     * Business Portal and any other consumer. Regenerating a slot immediately
-     * invalidates whoever held it, so the two sides must not share one.
+     * Which key slot this terminal owns, per environment family.
+     *
+     * On the cloud environments the POS has always taken SECONDARY, leaving PRIMARY
+     * to the Business Portal; changing that now would invalidate whatever holds it.
+     *
+     * On-prem the convention is the other way round and is deliberate: the POS fleet
+     * owns PRIMARY and the in-cluster lfi-reference owns SECONDARY. Regenerating a
+     * slot immediately invalidates its previous holder, the plaintext is shown once
+     * and cannot be recovered, and the backend caches key config for about five
+     * minutes — so a collision looks like an intermittent fault half an hour later.
+     * The split is what keeps a POS rotation from breaking screening. It matches
+     * scripts/pos-fetch-key.sh and POS_BOOTSTRAP_BRAIN.md section 6.3.
      */
-    private static final String LFI_KEY_TYPE       = "SECONDARY";
+    private static final String KEY_SLOT_CLOUD   = "SECONDARY";
+    private static final String KEY_SLOT_ON_PREM = "PRIMARY";
+
     private static final int    LFI_KEY_EXPIRY_DAYS = 365;
+
+    /** Portal login for an environment, or null when the operator must supply one. */
+    private static Credentials credentialsFor(String env) {
+        if (!QRConfig.isOnPrem(env)) {
+            return new Credentials(CLOUD_AUTH_USERNAME, CLOUD_AUTH_PASSWORD);
+        }
+        if (!PreferencesUtil.hasPortalCredentials(env)) return null;
+        return new Credentials(
+            PreferencesUtil.getPortalUsername(env),
+            PreferencesUtil.getPortalPassword(env));
+    }
+
+    private static final class Credentials {
+        final String username;
+        final String password;
+        Credentials(String username, String password) {
+            this.username = username;
+            this.password = password;
+        }
+    }
+
+    /** The slot this terminal mints into on the given environment. */
+    private static String keySlotFor(String env) {
+        return QRConfig.isOnPrem(env) ? KEY_SLOT_ON_PREM : KEY_SLOT_CLOUD;
+    }
+
+    /** Shown wherever the terminal cannot proceed without the operator. */
+    private static final String NEEDS_OPERATOR_SETUP =
+        "Enter an API key or portal credentials in Settings";
 
     /** Renew once the stored key is within this window of expiring. */
     private static final long RENEW_BEFORE_MS = 7L * 24 * 60 * 60 * 1000;
@@ -110,7 +160,20 @@ public class ApiKeyManager {
      * falls back to it rather than blocking a sale.
      */
     public synchronized void ensureReady(OnReadyCallback onReady, OnErrorCallback onError) {
+        String env = PreferencesUtil.getEnv();
         boolean haveKey = !PreferencesUtil.getLfiApiKey().isEmpty();
+
+        // On-prem: a stored key is final, whatever its origin and whatever its
+        // expiry says. Minting there rotates a slot on a live Central Bank box,
+        // invalidates whoever else held it, and cannot be undone — the plaintext of
+        // the old key is gone. "Fetch if absent" means exactly that, and absent is
+        // the only condition under which this class will mint on those environments.
+        if (haveKey && QRConfig.isOnPrem(env)) {
+            Log.i(TAG, "apikey: ready env=" + env + " source=stored (on-prem, never re-minted)");
+            state = State.READY;
+            mainHandler.post(onReady::onReady);
+            return;
+        }
 
         // A key pasted in Settings is the operator's deliberate choice and may be
         // the only one that works on this env (some envs 403 the regenerate call).
@@ -124,6 +187,16 @@ public class ApiKeyManager {
         if (haveKey && !isExpiringSoon()) {
             state = State.READY;
             mainHandler.post(onReady::onReady);
+            return;
+        }
+
+        // Nothing stored, and on-prem there is nothing to mint with unless the
+        // operator has supplied a portal login. Say so instead of failing at the
+        // network layer with something that reads like an outage.
+        if (credentialsFor(env) == null) {
+            Log.w(TAG, "apikey: blocked env=" + env + " reason=no-key-no-credentials");
+            state = State.FAILED;
+            mainHandler.post(() -> onError.onError(NEEDS_OPERATOR_SETUP));
             return;
         }
 
@@ -159,14 +232,50 @@ public class ApiKeyManager {
      * once a replacement actually arrives.
      */
     public synchronized void fetch(OnReadyCallback onReady, OnErrorCallback onError) {
+        fetch(false, onReady, onError);
+    }
+
+    /**
+     * As {@link #fetch(OnReadyCallback, OnErrorCallback)}, distinguishing an operator
+     * who asked for a new key from the app recovering by itself.
+     *
+     * The two must not behave the same on an on-prem environment. Automatic recovery
+     * there must never rotate: a 401 on a stored key means the key is wrong, and
+     * minting a replacement would invalidate whatever else holds that slot — most
+     * likely the in-cluster lfi-reference, whose screening leg then fails, roughly
+     * five minutes later, looking like something else entirely. An operator standing
+     * in front of the terminal choosing "Fetch from portal" is a different act, and
+     * is allowed.
+     *
+     * @param operatorInitiated true only from a deliberate action in Settings
+     */
+    public synchronized void fetch(boolean operatorInitiated,
+                                   OnReadyCallback onReady,
+                                   OnErrorCallback onError) {
+        String env = PreferencesUtil.getEnv();
+        boolean haveKey = !PreferencesUtil.getLfiApiKey().isEmpty();
+
         // Settings clears the manual flag before an explicit fetch, so arriving
         // here with it still set means this is an automatic 401 recovery. Minting
         // would throw away the operator's key and, on envs where regenerate is
         // forbidden, leave the terminal with nothing. Report the real problem: the
         // key that was entered by hand is the one the gateway just rejected.
-        if (PreferencesUtil.isLfiApiKeyManual() && !PreferencesUtil.getLfiApiKey().isEmpty()) {
+        if (PreferencesUtil.isLfiApiKeyManual() && haveKey) {
             mainHandler.post(() -> onError.onError(
                 "The API key entered in Settings was rejected — update it in Settings."));
+            return;
+        }
+
+        if (QRConfig.isOnPrem(env) && haveKey && !operatorInitiated) {
+            Log.w(TAG, "apikey: refused env=" + env + " reason=stored-key-rejected-no-auto-rotation");
+            mainHandler.post(() -> onError.onError(
+                "API key rejected — verify or re-enter it in Settings."));
+            return;
+        }
+
+        if (credentialsFor(env) == null) {
+            Log.w(TAG, "apikey: blocked env=" + env + " reason=no-credentials");
+            mainHandler.post(() -> onError.onError(NEEDS_OPERATOR_SETUP));
             return;
         }
 
@@ -180,6 +289,40 @@ public class ApiKeyManager {
 
         state = State.FETCHING;
         startLogin();
+    }
+
+    /**
+     * Startup hook: mint a key once, if and only if the terminal needs one and can.
+     *
+     * The point is that an on-prem terminal should be usable the moment it is handed
+     * to a merchant with credentials already configured, rather than failing the
+     * first sale and sending someone into Settings. Every condition is a refusal:
+     *
+     *   not on-prem      -> the cloud path already self-heals, leave it alone
+     *   key stored       -> never re-mint, whatever its origin (see ensureReady)
+     *   no credentials   -> nothing to mint with; the operator will be told when
+     *                       a sale is attempted, which is a better moment than a
+     *                       toast at launch
+     *
+     * Runs on whatever thread calls it; the underlying request is asynchronous.
+     */
+    public void mintOnStartupIfNeeded() {
+        String env = PreferencesUtil.getEnv();
+        if (!QRConfig.isOnPrem(env)) return;
+        if (!PreferencesUtil.getLfiApiKey().isEmpty()) {
+            Log.i(TAG, "apikey: startup env=" + env + " outcome=key-already-stored");
+            return;
+        }
+        if (!PreferencesUtil.hasPortalCredentials(env)) {
+            Log.i(TAG, "apikey: startup env=" + env + " outcome=no-credentials-configured");
+            return;
+        }
+
+        Log.i(TAG, "apikey: startup env=" + env + " outcome=minting slot=" + keySlotFor(env));
+        fetch(
+            () -> Log.i(TAG, "apikey: startup env=" + env + " outcome=minted"),
+            message -> Log.w(TAG, "apikey: startup env=" + env + " outcome=failed " + message)
+        );
     }
 
     /**
@@ -263,9 +406,19 @@ public class ApiKeyManager {
      */
     private void requestOperatorToken(TokenCallback callback) {
         try {
+            String env = PreferencesUtil.getEnv();
+            Credentials credentials = credentialsFor(env);
+            if (credentials == null) {
+                // Belt and braces. Both callers check first; this makes it impossible
+                // for a future one to reach the network with the cloud constants on an
+                // on-prem environment by forgetting to.
+                callback.onFailure(NEEDS_OPERATOR_SETUP);
+                return;
+            }
+
             JSONObject body = new JSONObject();
-            body.put("username", LFI_AUTH_USERNAME);
-            body.put("password", LFI_AUTH_PASSWORD);
+            body.put("username", credentials.username);
+            body.put("password", credentials.password);
             body.put("realm",    LFI_AUTH_REALM);
 
             Request req = new Request.Builder()
@@ -286,7 +439,7 @@ public class ApiKeyManager {
                     Log.d(TAG, "login [" + response.code() + "]");
                     if (!response.isSuccessful()) {
                         callback.onFailure("Gateway auth failed: "
-                            + QRConfig.errorTextOf(respBody, response.code()));
+                            + QRConfig.errorTextOf(respBody, response));
                         return;
                     }
                     try {
@@ -303,8 +456,11 @@ public class ApiKeyManager {
 
     private void startRegen(String accessToken) {
         try {
+            final String env  = PreferencesUtil.getEnv();
+            final String slot = keySlotFor(env);
+
             JSONObject body = new JSONObject();
-            body.put("keyType",    LFI_KEY_TYPE);
+            body.put("keyType",    slot);
             body.put("expiryDays", LFI_KEY_EXPIRY_DAYS);
 
             Request req = new Request.Builder()
@@ -325,10 +481,12 @@ public class ApiKeyManager {
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
                     String respBody = response.body() == null ? "" : response.body().string();
-                    Log.d(TAG, "regen [" + response.code() + "] keyType=" + LFI_KEY_TYPE);
+                    Log.d(TAG, "regen [" + response.code() + "] keyType=" + slot);
                     if (!response.isSuccessful()) {
+                        Log.w(TAG, "apikey: mint-failed env=" + env + " slot=" + slot
+                            + " http=" + response.code());
                         deliverError("Gateway key setup failed: "
-                            + QRConfig.errorTextOf(respBody, response.code()));
+                            + QRConfig.errorTextOf(respBody, response));
                         return;
                     }
                     try {
@@ -336,8 +494,13 @@ public class ApiKeyManager {
                         PreferencesUtil.setLfiApiKey(json.getString("apiKey"));
                         PreferencesUtil.setLfiApiKeyExpiry(json.optString("expiresAt", ""));
                         PreferencesUtil.setLfiApiKeyManual(false);
+                        Log.i(TAG, "apikey: minted env=" + env + " slot=" + slot
+                            + " lfi=" + QRConfig.getXLfiId(env)
+                            + " expires=" + json.optString("expiresAt", "?"));
                         deliverReady();
                     } catch (Exception e) {
+                        Log.w(TAG, "apikey: mint-failed env=" + env + " slot=" + slot
+                            + " reason=unparseable-response");
                         deliverError("Gateway key setup response invalid");
                     }
                 }

@@ -48,6 +48,12 @@ dependencies {
     implementation 'com.google.android.material:material:1.9.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 
+    // Keystore-backed storage for the API key and the portal password. Every use is
+    // guarded and falls back to the plain preferences file — see utils/SecurePrefs:
+    // the Android Keystore is not uniformly reliable on vendor POS firmware, and a
+    // terminal that cannot take payments is worse than one storing a key in plaintext.
+    implementation 'androidx.security:security-crypto:1.0.0'
+
     // Trust-scope test only. Pinned to the okhttp version above: MockWebServer and
     // okhttp-tls share okhttp's internals, and a mismatch fails at run time, not
     // at resolution.
