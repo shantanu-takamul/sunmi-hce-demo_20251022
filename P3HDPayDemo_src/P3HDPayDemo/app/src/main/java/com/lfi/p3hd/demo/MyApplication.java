@@ -3,6 +3,8 @@ package com.lfi.p3hd.demo;
 import android.app.Application;
 import android.util.Log;
 
+import com.lfi.p3hd.demo.net.HttpClients;
+import com.lfi.p3hd.demo.net.TrustStore;
 import com.sunmi.pay.hardware.aidlv2.print.PrinterOptV2;
 import com.sunmi.pay.hardware.aidlv2.readcard.ReadCardOptV2;
 import com.sunmi.pay.hardware.wrapper.HCEManagerV2Wrapper;
@@ -22,6 +24,10 @@ public class MyApplication extends Application {
     public void onCreate() {
         super.onCreate();
         app = this;
+        // Before anything can make a request: tell HttpClients where an
+        // operator-imported CA override lives. Without this the on-prem clients see
+        // only the anchor bundled in the APK.
+        HttpClients.setTrustProvider(TrustStore::operatorOverrideFor);
         bindPaySDKService();
     }
 
