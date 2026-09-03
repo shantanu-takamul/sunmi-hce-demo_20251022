@@ -14,6 +14,13 @@ android {
         versionName "1.0"
     }
 
+    // BuildConfig.DEBUG gates anything that must never run in a shipped APK —
+    // response-body logging, the offline TLS rig's simulator CA. AGP 8 stopped
+    // generating BuildConfig unless asked.
+    buildFeatures {
+        buildConfig true
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -25,6 +32,12 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
+    testOptions {
+        // android.util.Log is the only Android API the unit tests reach; let it
+        // no-op instead of throwing "not mocked".
+        unitTests.returnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -34,4 +47,17 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // Keystore-backed storage for the API key and the portal password. Every use is
+    // guarded and falls back to the plain preferences file — see utils/SecurePrefs:
+    // the Android Keystore is not uniformly reliable on vendor POS firmware, and a
+    // terminal that cannot take payments is worse than one storing a key in plaintext.
+    implementation 'androidx.security:security-crypto:1.0.0'
+
+    // Trust-scope test only. Pinned to the okhttp version above: MockWebServer and
+    // okhttp-tls share okhttp's internals, and a mismatch fails at run time, not
+    // at resolution.
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'com.squareup.okhttp3:mockwebserver:3.14.9'
+    testImplementation 'com.squareup.okhttp3:okhttp-tls:3.14.9'
 }

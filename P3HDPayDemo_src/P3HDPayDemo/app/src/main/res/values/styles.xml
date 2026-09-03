@@ -54,6 +54,40 @@
         <item name="rippleColor">@color/primary_dark</item>
     </style>
 
+    <!--
+      Void a sale. Filled error red because it is destructive, prominent, and only
+      offered for a few seconds — the operator has to find it fast.
+    -->
+    <style name="DangerButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="backgroundTint">@color/error</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">8dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+    </style>
+
+    <!--
+      Refund. Same destructive intent, deliberately quieter than DangerButton: it
+      stays on screen indefinitely and must not compete with Print Receipt.
+    -->
+    <style name="DangerOutlineButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="android:textColor">@color/error</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">8dp</item>
+        <item name="strokeColor">@color/error</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="rippleColor">@color/error_soft</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+    </style>
+
     <style name="NumpadButton" parent="Widget.MaterialComponents.Button">
         <item name="android:textSize">30sp</item>
         <item name="android:textColor">@color/numpad_text</item>
@@ -127,6 +161,57 @@
         <item name="android:textColor">@color/text_primary</item>
         <item name="android:textSize">13sp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">3</item>
+    </style>
+
+    <!--
+      Print rendition of the receipt rows above.
+
+      Every dimension is in px, and deliberately so. The paper is 384 dots wide
+      full stop, so a print layout is the one place in the app measuring in device
+      pixels is correct: px is the only unit that means the same thing on the head
+      as it does in the layout pass. dp would be multiplied by the P3H's 1.6875
+      density and sp would then be multiplied again by whatever font scale the
+      operator has set, so a receipt would change size when nothing about the
+      paper had.
+
+      Colours are black, not the screen's greys. A thermal head has one ink and no
+      shades of it, so a #64748B label is not a softer label, it is the same black
+      arrived at through a dither.
+    -->
+    <style name="PrintReceiptRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">12px</item>
+        <item name="android:gravity">top</item>
+        <item name="android:orientation">horizontal</item>
+    </style>
+
+    <!--
+      144px holds the widest label, "Transaction ID", which measures 132px at 21px
+      on this head, with a little slack for a font that is not byte-identical.
+      It is no wider than that because every dot the label column gives back is a
+      dot the value column gets, and the value column is where the 36 character
+      UUIDs wrap: 220px puts them on two lines, 210px on three, the last of which
+      carries two characters and a lot of white space.
+    -->
+    <style name="PrintReceiptLabel">
+        <item name="android:layout_width">136px</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginEnd">8px</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textSize">20px</item>
+    </style>
+
+    <style name="PrintReceiptValue">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">end</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textSize">21px</item>
+        <item name="android:textStyle">bold</item>
+        <!-- Wallet ids and UUIDs run past the column; wrapping keeps them whole. -->
         <item name="android:maxLines">3</item>
     </style>
 </resources>

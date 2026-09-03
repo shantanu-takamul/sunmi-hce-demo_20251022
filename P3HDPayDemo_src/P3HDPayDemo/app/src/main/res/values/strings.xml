@@ -26,6 +26,8 @@
     <string name="qr_pay_amount_subtitle">Enter the amount before presenting a QR or NFC payment method.</string>
     <string name="qr_pay_amount_hint">AED</string>
     <string name="qr_pay_amount_error">Please enter a valid amount greater than 0</string>
+    <string name="qr_pay_amount_below_min">Amount is below the minimum of AED %1$s</string>
+    <string name="qr_pay_amount_above_max">Amount is above the maximum of AED %1$s</string>
     <string name="qr_pay_error_network">Network error</string>
     <string name="qr_pay_error_parse">Invalid response from server</string>
     <string name="qr_pay_status_preparing">Preparing payment gateway\u2026</string>
@@ -61,6 +63,25 @@
     <string name="payment_success_terminal">Terminal</string>
     <string name="payment_success_merchant">Merchant</string>
 
+    <!-- Cancel / refund on the post-sale screen -->
+    <!-- %1$d is the seconds left in the void window -->
+    <string name="payment_success_cancel_countdown">Cancel Payment (%1$d s)</string>
+    <string name="payment_success_cancelling">Cancelling…</string>
+    <string name="payment_success_refund">Refund Payment</string>
+    <string name="payment_success_refunding">Submitting refund…</string>
+    <string name="payment_success_cancel_confirm_title">Cancel this payment?</string>
+    <string name="payment_success_refund_confirm_title">Refund this payment?</string>
+    <string name="payment_success_cancel_confirm_action">Cancel Payment</string>
+    <string name="payment_success_refund_confirm_action">Refund</string>
+    <string name="payment_success_return_dismiss">Keep Payment</string>
+    <string name="payment_success_refund_submitted">Refund submitted</string>
+    <string name="payment_success_cancel_unavailable">Already settled — cancel is no longer possible. Use Refund.</string>
+    <!-- Hero state once a cancel is confirmed -->
+    <string name="payment_cancelled_heading">Payment Cancelled</string>
+    <!-- %1$s is the amount, e.g. "AED 3.75" -->
+    <string name="payment_cancelled_subtext">%1$s was not charged. The customer\'s funds have been released.</string>
+    <string name="payment_cancelled_done">Done</string>
+
     <!-- Expired -->
     <string name="qr_expired_title">QR Expired</string>
     <string name="qr_expired_heading">QR Code Expired</string>
@@ -76,6 +97,7 @@
     <string name="nfc_pay_title">NFC Payment</string>
     <string name="nfc_pay_instruction">Tap your phone to this device</string>
     <string name="nfc_pay_subtitle">Hold customer&#8217;s phone near the screen</string>
+    <string name="nfc_pay_status_generating">Generating NFC payment code\u2026</string>
 
     <!-- HCE -->
     <string name="hce_title">HCE Emulate</string>
@@ -114,13 +136,45 @@
     <string name="setting_env_title">Select Environment</string>
     <string name="setting_change">Change</string>
     <string name="setting_api_key_label">API Key</string>
+    <string name="setting_api_key_title">API Key</string>
+    <string name="setting_api_key_fetch">Fetch from portal</string>
+    <string name="setting_api_key_manual">Enter key manually</string>
     <string name="setting_refresh">Refresh</string>
     <string name="setting_wallet_id_label">QR Wallet ID</string>
     <string name="setting_wallet_id_title">Enter Wallet ID</string>
     <string name="setting_nfc_wallet_id_label">NFC Wallet ID</string>
     <string name="setting_nfc_wallet_id_title">Enter NFC Wallet ID</string>
+    <string name="setting_nfc_wallet_type_label">NFC Wallet Type</string>
+    <string name="setting_nfc_wallet_type_title">Select NFC Wallet Type</string>
     <string name="setting_nfc_merchant_name_label">NFC Merchant Name</string>
     <string name="setting_nfc_merchant_name_title">Enter Merchant Name</string>
+
+    <!-- Settings: on-premise (bootstrap / sit) section -->
+    <string name="setting_onprem_section">On-premise environment</string>
+    <string name="setting_base_url_label">Base URL</string>
+    <string name="setting_base_url_title">Gateway base URL</string>
+    <string name="setting_lfi_id_label">LFI ID (X-LFI-ID)</string>
+    <string name="setting_lfi_id_title">Acquirer LFI ID</string>
+    <string name="setting_portal_creds_label">Portal operator login</string>
+    <string name="setting_portal_creds_title">Portal operator login</string>
+    <string name="setting_portal_creds_hint">Used only to mint an API key on this environment.</string>
+    <string name="setting_portal_username_hint">username</string>
+    <string name="setting_portal_password_hint">password</string>
+    <string name="setting_portal_creds_none">Not set</string>
+    <string name="setting_portal_creds_cleared">Portal login cleared</string>
+    <string name="setting_ca_label">CA trust</string>
+    <string name="setting_ca_title">Certificate authority</string>
+    <string name="setting_ca_import">Import a CA PEM…</string>
+    <string name="setting_ca_use_bundled">Use the CA bundled in this build</string>
+    <string name="setting_ca_imported">CA imported</string>
+    <string name="setting_ca_cleared">Using the bundled CA</string>
+    <string name="setting_test_connection">Test connection</string>
+    <string name="setting_test_connection_running">Testing…</string>
+    <string name="setting_test_connection_title">Connection test</string>
+    <string name="setting_verify_key">Verify key</string>
+    <string name="setting_verify_key_running">Verifying…</string>
+    <string name="setting_verify_key_title">API key check</string>
+    <string name="setting_close">Close</string>
 
     <!-- Transaction History -->
     <string name="card_tx_history">Transactions</string>
@@ -133,6 +187,8 @@
     <string name="tx_view">View Details</string>
     <string name="tx_refund">Refund</string>
     <string name="tx_already_refunded">Refunded</string>
+    <string name="tx_already_cancelled">Cancelled</string>
+    <string name="tx_refund_pending">Refund Pending</string>
 
     <!-- Navigation -->
     <string name="back">Back</string>

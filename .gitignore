@@ -53,3 +53,6 @@ keystore.properties
 /META-INF/
 /com/
 /sunmi/
+
+# Local per-developer config for the gateway test scripts — holds the LFI API key, never commit.
+P3HDPayDemo_src/P3HDPayDemo/scripts/bootstrap.env

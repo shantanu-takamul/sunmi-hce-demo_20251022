@@ -98,6 +98,22 @@
                 android:layout_marginTop="18dp"
                 android:gravity="center"
                 android:text="@string/qr_pay_scan_instruction" />
+
+            <!--
+              Poll health. Hidden while polling succeeds; shown after three
+              consecutive failures, carrying a classified reason. Without it a
+              gateway the terminal cannot reach looks exactly like a customer who has
+              not paid yet — a live QR counting down to nothing.
+            -->
+            <TextView
+                android:id="@+id/tv_poll_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center"
+                android:textColor="@color/error"
+                android:textSize="13sp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <com.google.android.material.button.MaterialButton

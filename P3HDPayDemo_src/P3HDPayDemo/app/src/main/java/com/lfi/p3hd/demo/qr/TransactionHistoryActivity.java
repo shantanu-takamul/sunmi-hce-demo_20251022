@@ -16,6 +16,8 @@ import androidx.annotation.Nullable;
 
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.net.HttpClients;
+import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
 
 import org.json.JSONArray;
@@ -24,18 +26,20 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import okhttp3.HttpUrl;
-import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class TransactionHistoryActivity extends BaseAppCompatActivity {
@@ -43,7 +47,36 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
     private ListView listTransactions;
     private View layoutLoading;
     private View layoutEmpty;
-    private final OkHttpClient httpClient = new OkHttpClient();
+    /**
+     * The shared client for the active environment.
+     *
+     * Resolved per use rather than held in a field: a field is frozen at
+     * construction, so an environment switch never reaches it.
+     */
+    private OkHttpClient httpClient() {
+        return HttpClients.forCurrentEnv();
+    }
+
+    // GAP 5: one idempotency key per original transaction ID, reused on retry to prevent double-refund
+    private final Map<String, String> idempotencyKeys = new HashMap<>();
+
+    // Tracks transactions where a refund is in-flight (CONCURRENT_REQUEST / KEY_CONFLICT)
+    // so the UI can show "Refund Pending" badge even before the history API reflects it.
+    private final Set<String> pendingRefunds = Collections.synchronizedSet(new HashSet<>());
+
+    private String getOrCreateIdempotencyKey(String txId) {
+        return idempotencyKeys.computeIfAbsent(txId, k -> UUID.randomUUID().toString());
+    }
+
+    /** Carries both the user-facing message and whether the refund is now in a pending state. */
+    private static class RefundResult {
+        final String  message;
+        final boolean isPending;   // true → show "Refund Pending" badge on this transaction
+        RefundResult(String message, boolean isPending) {
+            this.message   = message;
+            this.isPending = isPending;
+        }
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -83,6 +116,10 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
     }
 
     private List<Transaction> fetchTransactions() throws Exception {
+        return fetchTransactions(false);
+    }
+
+    private List<Transaction> fetchTransactions(boolean isRetry) throws Exception {
         String walletId = PreferencesUtil.getWalletId();
         if (walletId.isEmpty()) walletId = QRConfig.getDefaultWalletId();
 
@@ -106,15 +143,32 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
         String apiKey = PreferencesUtil.getLfiApiKey();
         if (!apiKey.isEmpty()) reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
 
-        try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
-            String body = response.body() == null ? "" : response.body().string();
-            Log.d(TAG, "fetchTransactions [" + response.code() + "]: "
+        int code;
+        String body;
+        String location;
+        try (Response response = httpClient().newCall(reqBuilder.build()).execute()) {
+            code = response.code();
+            body = response.body() == null ? "" : response.body().string();
+            // Read before the response closes: a 3xx names the intermediary that
+            // answered, which is the whole diagnosis on an unreachable gateway.
+            location = response.header("Location");
+            Log.d(TAG, "fetchTransactions [" + code + "]: "
                     + body.substring(0, Math.min(300, body.length())));
-            if (!response.isSuccessful()) {
-                throw new Exception("HTTP " + response.code());
-            }
-            return parseTransactions(new JSONObject(body));
         }
+
+        // Stored key expired — mint a fresh one and retry once. Safe to block:
+        // this method already runs on its own thread.
+        if (code == 401 && !isRetry) {
+            Log.w(TAG, "fetchTransactions: 401 — renewing API key");
+            if (ApiKeyManager.get().fetchBlocking(30_000)) {
+                return fetchTransactions(true);
+            }
+            throw new Exception("API key expired and could not be renewed");
+        }
+        if (code < 200 || code >= 300) {
+            throw new Exception(QRConfig.errorTextOf(body, code, location));
+        }
+        return parseTransactions(new JSONObject(body));
     }
 
     private List<Transaction> parseTransactions(JSONObject json) {
@@ -130,15 +184,53 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             tx.transactionId     = obj.optString("transactionId", "");
             tx.transactionType   = obj.optString("transactionType", "");
             tx.transactionStatus = obj.optString("transactionStatus", "");
-            tx.payerWalletId     = obj.optString("payerWalletId", "");
-            tx.payeeWalletId     = obj.optString("payeeWalletId", "");
+            // QA nests these in movements[]; demo returns them flat. See QRConfig.
+            tx.payerWalletId     = QRConfig.walletFrom(obj, "payerWalletId");
+            tx.payeeWalletId     = QRConfig.walletFrom(obj, "payeeWalletId");
             tx.amountFils        = obj.optLong("amount", 0);
             tx.currency          = obj.optString("currency", QRConfig.CURRENCY);
-            tx.requestId         = obj.optString("requestId", "");
-            tx.createdAt         = obj.optString("createdAt", "");
+            tx.requestId              = obj.optString("requestId", "");
+            tx.createdAt              = obj.optString("createdAt", "");
+            tx.originalTransactionId  = obj.optString("originalTransactionId", ""); // GAP 6
+            tx.reference              = obj.optString("reference", "");             // GAP 6
+            tx.updatedAt              = obj.optString("updatedAt", "");             // GAP 6
+            tx.failureCode            = obj.optString("failureCode", "");           // GAP 6
+            tx.failureReason          = obj.optString("failureReason", "");         // GAP 6
 
-            JSONArray refunds = obj.optJSONArray("refunds");
-            tx.hasRefunds = refunds != null && refunds.length() > 0;
+            // The commission the sale was booked with, so a refund reverses the same
+            // split rather than assuming this terminal's zero. Only present once the
+            // sale has settled; 0 otherwise. See QRConfig#commissionFrom.
+            tx.commissionFils = QRConfig.commissionFrom(obj);
+
+            // GAP 2: classify each return entry — SUCCESS blocks retry; FAILED allows retry;
+            // anything else (PENDING / SCREENING_*) marks the transaction as "in progress".
+            //
+            // The array holds CANCEL rows as well as REFUND rows, and the two have to
+            // be told apart: a cancelled sale must not then offer a refund, and it
+            // should not read as "Refunded" either.
+            JSONArray returns = QRConfig.returnsOf(obj);
+            tx.hasRefunds = returns != null && returns.length() > 0;
+            if (returns != null) {
+                for (int j = 0; j < returns.length(); j++) {
+                    JSONObject r = returns.optJSONObject(j);
+                    if (r == null) continue;
+                    String status     = QRConfig.returnStatusOf(r);
+                    boolean isCancel  = ReturnApi.TYPE_CANCEL.equals(r.optString("type", ""));
+                    if ("SUCCESS".equals(status)) {
+                        if (isCancel) {
+                            tx.hasSuccessCancel = true;
+                        } else {
+                            tx.hasSuccessRefund = true;
+                        }
+                        tx.refundTxId = QRConfig.returnTxIdOf(r);
+                    } else if (!"FAILED".equals(status) && !status.isEmpty()) {
+                        // PENDING, SCREENING_REQUESTED, CBDC_PENDING, etc. — in progress.
+                        // A refund is asynchronous now, so this is the state every
+                        // refund passes through before its callback lands.
+                        tx.hasPendingRefund = true;
+                    }
+                }
+            }
 
             list.add(tx);
         }
@@ -151,6 +243,17 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             layoutEmpty.setVisibility(View.VISIBLE);
             listTransactions.setVisibility(View.GONE);
             return;
+        }
+        // Apply in-session pending state: if postRefund returned CONCURRENT or CONFLICT this
+        // session, mark the transaction pending even if the history API doesn't reflect it yet.
+        for (Transaction tx : transactions) {
+            if (pendingRefunds.contains(tx.transactionId) && !tx.isReturned()) {
+                tx.hasPendingRefund = true;
+            }
+            // Once the API shows a settled return, remove from pending set.
+            if (tx.isReturned()) {
+                pendingRefunds.remove(tx.transactionId);
+            }
         }
         layoutEmpty.setVisibility(View.GONE);
         listTransactions.setVisibility(View.VISIBLE);
@@ -169,7 +272,15 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
                 + "\nPayee: " + (txn.payeeWalletId.isEmpty() ? "—" : txn.payeeWalletId)
                 + "\nDate: " + (date.isEmpty() ? "—" : date)
                 + (txn.requestId.isEmpty() ? "" : "\nRequest ID:\n" + txn.requestId)
-                + (txn.hasRefunds ? "\n\n[Already refunded]" : "");
+                + (txn.reference.isEmpty() ? "" : "\nReference: " + txn.reference)
+                + (txn.failureCode.isEmpty() ? "" : "\nFailure Code: " + txn.failureCode)
+                + (txn.failureReason.isEmpty() ? "" : "\nFailure Reason: " + txn.failureReason)
+                + (txn.commissionFils > 0
+                    ? "\nCommission: " + txn.currency + " "
+                        + QRConfig.filsToAedText(txn.commissionFils)
+                    : "")
+                + (txn.hasSuccessCancel ? "\n\nCancelled — ID:\n" + txn.refundTxId
+                    : txn.hasSuccessRefund ? "\n\nRefunded — ID:\n" + txn.refundTxId : "");
 
         new AlertDialog.Builder(this)
                 .setTitle("Transaction Details")
@@ -179,8 +290,16 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
     }
 
     private void showRefundDialog(Transaction txn) {
-        if (txn.hasRefunds) {
+        if (txn.hasSuccessCancel) {
+            showToast("This payment was cancelled — there is nothing to refund");
+            return;
+        }
+        if (txn.hasSuccessRefund) {
             showToast("This transaction has already been refunded");
+            return;
+        }
+        if (txn.hasPendingRefund) {
+            showToast("A refund is already in progress — refresh to check the status");
             return;
         }
         if (!"SUCCESS".equals(txn.transactionStatus)) {
@@ -191,14 +310,31 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             showToast("Cannot refund: amount is zero");
             return;
         }
+        // A refund swaps payer and payee, so both must be known. If the history
+        // response carried neither the flat wallets nor a movements[] entry we
+        // would post empty wallet ids and the gateway would reject it with a
+        // validation error that says nothing useful to the cashier.
+        if (txn.payerWalletId.isEmpty() || txn.payeeWalletId.isEmpty()) {
+            showToast("Cannot refund: this transaction has no payer/payee wallet details");
+            return;
+        }
 
         String amountAed = String.format(Locale.US, "%.2f", txn.amountFils / 100.0);
         String shortId = txn.transactionId.length() > 8
                 ? "..." + txn.transactionId.substring(txn.transactionId.length() - 8)
                 : txn.transactionId;
 
+        // A refund is full-amount only and is now processed asynchronously — the
+        // gateway accepts it and screens it out of band — so the dialog promises
+        // submission, not completion.
         String message = "Refund " + txn.currency + " " + amountAed + " to customer?\n\n"
-                + "Transaction: " + shortId + "\n\nThis action cannot be undone.";
+                + "Transaction: " + shortId
+                + (txn.commissionFils > 0
+                    ? "\nCommission reversed: " + txn.currency + " "
+                        + QRConfig.filsToAedText(txn.commissionFils)
+                    : "")
+                + "\n\nThis action cannot be undone. The refund is processed in the "
+                + "background — refresh to see the outcome.";
 
         new AlertDialog.Builder(this)
                 .setTitle("Confirm Refund")
@@ -212,88 +348,59 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
         showToast("Processing refund…");
         new Thread(() -> {
             try {
-                String result = postRefund(txn);
+                RefundResult result = postRefund(txn);
                 if (!isFinishing()) {
                     runOnUiThread(() -> {
-                        showToast(result);
+                        if (result.isPending) pendingRefunds.add(txn.transactionId);
+                        showToast(result.message);
                         loadTransactions();
                     });
                 }
             } catch (SocketTimeoutException e) {
                 // Sanctions screening can outlast OkHttp's read window even at 90 s.
-                // The server may still complete the refund — do not retry automatically.
+                // Mark pending so the badge appears immediately; server may still complete.
                 Log.e(TAG, "executeRefund timed out", e);
                 if (!isFinishing()) {
-                    runOnUiThread(() -> showToast(
-                            "Refund is taking longer than expected. " +
-                            "Refresh the list in a moment — it may still complete."));
+                    runOnUiThread(() -> {
+                        pendingRefunds.add(txn.transactionId);
+                        showToast("Refund is taking longer than expected — " +
+                                "it's queued on the server. Refresh to check the status.");
+                        loadTransactions();
+                    });
                 }
             } catch (Exception e) {
                 Log.e(TAG, "executeRefund failed", e);
                 if (!isFinishing()) {
-                    runOnUiThread(() -> showToast("Refund failed: " + e.getMessage()));
+                    runOnUiThread(() -> showToast(e.getMessage()));
                 }
             }
         }).start();
     }
 
-    private String postRefund(Transaction txn) throws Exception {
-        String url = QRConfig.getBaseUrl() + QRConfig.RETURN_ENDPOINT + txn.transactionId;
+    private RefundResult postRefund(Transaction txn) throws Exception {
+        ReturnApi.Call call = new ReturnApi.Call();
+        call.transactionId  = txn.transactionId;
+        call.type           = ReturnApi.TYPE_REFUND;
+        call.amountFils     = txn.amountFils;
+        // Reverse exactly the commission the sale was booked with. 0 when the sale
+        // has not settled yet, which is also the right figure for every QR this
+        // terminal generates — see QRConfig#QR_COMMISSION_AMOUNT.
+        call.commissionFils = txn.commissionFils;
+        // A refund reverses the sale, so the merchant (the sale's payee) pays and
+        // the customer (the sale's payer) receives.
+        call.payerWalletId  = txn.payeeWalletId;
+        call.payeeWalletId  = txn.payerWalletId;
+        // GAP 5: reuse the same key on retry so server deduplicates and prevents double-refund
+        call.idempotencyKey = getOrCreateIdempotencyKey(txn.transactionId);
 
-        JSONObject body = new JSONObject();
-        body.put("originalTransactionId", txn.transactionId);
-        // In a refund the merchant (original payee) sends money back to the customer (original payer)
-        body.put("payerWalletId", txn.payeeWalletId);
-        body.put("payeeWalletId", txn.payerWalletId);
-        body.put("type", "REFUND");
-        body.put("amount", txn.amountFils);
-        body.put("reference", "REFUND-" + txn.transactionId.substring(
-                Math.max(0, txn.transactionId.length() - 8)));
+        ReturnApi.Result result = ReturnApi.execute(call);
 
-        Request.Builder reqBuilder = new Request.Builder()
-                .url(url)
-                .addHeader("X-LFI-ID", QRConfig.getXLfiId())
-                .addHeader("Content-Type", "application/json")
-                .addHeader("X-Idempotency-Key", UUID.randomUUID().toString())
-                .post(RequestBody.create(MediaType.parse("application/json"), body.toString()));
-
-        String apiKey = PreferencesUtil.getLfiApiKey();
-        if (!apiKey.isEmpty()) reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
-
-        // REFUND requires server-side sanctions screening which can take 30–60 s.
-        // Use a dedicated client with a longer read timeout so we don't time out early.
-        OkHttpClient refundClient = httpClient.newBuilder()
-                .readTimeout(90, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .build();
-
-        try (Response response = refundClient.newCall(reqBuilder.build()).execute()) {
-            String responseBody = response.body() == null ? "" : response.body().string();
-            Log.d(TAG, "postRefund [" + response.code() + "]: " + responseBody);
-
-            JSONObject json = new JSONObject(responseBody);
-
-            // 409 means the server already has a live or completed request for this transactionId
-            String errorCode = json.optString("errorCode", "");
-            if ("IDEMPOTENCY_CONCURRENT_REQUEST".equals(errorCode)) {
-                return "A refund is already in progress for this transaction. " +
-                       "Refresh the list in a moment to see the outcome.";
-            }
-
-            String status  = json.optString("status", "");
-            String message = json.optString("message", "");
-
-            if ("SUCCESS".equals(status)) {
-                return "Refund successful";
-            } else if (!response.isSuccessful()) {
-                throw new Exception("HTTP " + response.code()
-                        + (message.isEmpty() ? "" : ": " + message));
-            } else if (!message.isEmpty()) {
-                return "Refund " + status + ": " + message;
-            } else {
-                return "Refund status: " + (status.isEmpty() ? "HTTP " + response.code() : status);
-            }
+        if (result.succeeded) {
+            // GAP 5: clear the stored key — this transaction is fully settled
+            idempotencyKeys.remove(txn.transactionId);
+            pendingRefunds.remove(txn.transactionId);
         }
+        return new RefundResult(result.message, result.pending);
     }
 
     private String formatDisplayDate(String value) {
@@ -307,16 +414,35 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
     // --- Data model ---
 
     static class Transaction {
-        String transactionId     = "";
-        String transactionType   = "";
-        String transactionStatus = "";
-        String payerWalletId     = "";
-        String payeeWalletId     = "";
-        long   amountFils        = 0;
-        String currency          = "AED";
-        String requestId         = "";
-        String createdAt         = "";
-        boolean hasRefunds       = false;
+        String transactionId         = "";
+        String transactionType       = "";
+        String transactionStatus     = "";
+        String payerWalletId         = "";
+        String payeeWalletId         = "";
+        long   amountFils            = 0;
+        String currency              = "AED";
+        String requestId             = "";
+        String createdAt             = "";
+        // GAP 6: fields present in history response but previously unparsed
+        String originalTransactionId = "";
+        String reference             = "";
+        String updatedAt             = "";
+        String failureCode           = "";
+        String failureReason         = "";
+        // Commission the sale was booked with, reversed as-is by a refund
+        long   commissionFils        = 0;
+        // GAP 2: track whether any refund attempt succeeded (vs just attempted)
+        boolean hasRefunds           = false;
+        boolean hasSuccessRefund     = false;
+        boolean hasSuccessCancel     = false;  // voided — blocks refund, and is not a refund
+        boolean hasPendingRefund     = false;  // refund in-flight (screening / CBDC pending)
+        // GAP 3: refund transaction ID from a successful refund, for display/lookup
+        String  refundTxId           = "";
+
+        /** True when this sale has already been returned and must not be returned again. */
+        boolean isReturned() {
+            return hasSuccessRefund || hasSuccessCancel;
+        }
     }
 
     // --- List adapter ---
@@ -359,18 +485,40 @@ public class TransactionHistoryActivity extends BaseAppCompatActivity {
             String payer = txn.payerWalletId.isEmpty() ? "—" : txn.payerWalletId;
             ((TextView) convertView.findViewById(R.id.tv_tx_payer)).setText("From: " + payer);
 
+            // GAP 4: show type so merchant can distinguish payments from refund/cancel rows
+            ((TextView) convertView.findViewById(R.id.tv_tx_type))
+                    .setText(txn.transactionType);
+
             convertView.findViewById(R.id.btn_view)
                     .setOnClickListener(v -> showDetailDialog(txn));
 
+            // GAP 4: only PAY_TO_MERCHANT rows can be refunded; hide button for refund/cancel rows
             View btnRefund = convertView.findViewById(R.id.btn_refund);
-            boolean canRefund = "SUCCESS".equals(txn.transactionStatus) && !txn.hasRefunds;
+            boolean isMerchantPayment = "PAY_TO_MERCHANT".equals(txn.transactionType);
+            // Disable if: not a payment, not successful, already refunded or cancelled,
+            // or a return is still in flight
+            boolean canRefund = isMerchantPayment
+                    && "SUCCESS".equals(txn.transactionStatus)
+                    && !txn.isReturned()
+                    && !txn.hasPendingRefund;
+            btnRefund.setVisibility(isMerchantPayment ? View.VISIBLE : View.GONE);
             btnRefund.setEnabled(canRefund);
             btnRefund.setAlpha(canRefund ? 1f : 0.35f);
             btnRefund.setOnClickListener(v -> showRefundDialog(txn));
 
-            // Show "Refunded" label if already refunded
+            // Settled-return badge. A cancelled sale reads "Cancelled", not "Refunded":
+            // the money never left the customer, so calling it a refund misstates
+            // what happened on a row the operator may have to explain.
             TextView tvRefundedBadge = convertView.findViewById(R.id.tv_refunded_badge);
-            tvRefundedBadge.setVisibility(txn.hasRefunds ? View.VISIBLE : View.GONE);
+            tvRefundedBadge.setVisibility(txn.isReturned() ? View.VISIBLE : View.GONE);
+            tvRefundedBadge.setText(txn.hasSuccessCancel
+                    ? R.string.tx_already_cancelled
+                    : R.string.tx_already_refunded);
+
+            // "Refund Pending" badge — shown when refund is in-flight (sanctions screening etc.)
+            TextView tvRefundPendingBadge = convertView.findViewById(R.id.tv_refund_pending_badge);
+            tvRefundPendingBadge.setVisibility(
+                    (txn.hasPendingRefund && !txn.isReturned()) ? View.VISIBLE : View.GONE);
 
             return convertView;
         }

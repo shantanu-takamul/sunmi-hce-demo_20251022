@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 
 import com.lfi.p3hd.demo.BaseAppCompatActivity;
 import com.lfi.p3hd.demo.R;
+import com.lfi.p3hd.demo.net.HttpClients;
 import com.lfi.p3hd.demo.nfc.NFCPayActivity;
 import com.lfi.p3hd.demo.utils.ApiKeyManager;
 import com.lfi.p3hd.demo.utils.PreferencesUtil;
@@ -36,7 +37,27 @@ public class QRPayActivity extends BaseAppCompatActivity {
 
     private final StringBuilder amountBuilder = new StringBuilder("0");
     private String lastRequestId;
-    private final OkHttpClient httpClient = new OkHttpClient();
+    /**
+     * The shared client for the active environment.
+     *
+     * Resolved per use rather than held in a field: a field is frozen at
+     * construction, so an environment switch never reaches it.
+     */
+    private OkHttpClient httpClient() {
+        return HttpClients.forCurrentEnv();
+    }
+
+    /**
+     * True from the moment a sale is confirmed until the terminal is back at the
+     * keypad.
+     *
+     * Every tap of Generate mints a NEW requestId, so the gateway's duplicate
+     * rule — which only rejects a *reused* requestId — cannot protect against a
+     * double-tap. Two taps would produce two independently payable QR codes for
+     * one sale. This flag is the only thing preventing that, so it must be
+     * cleared exactly where the operator regains the keypad: showInputState().
+     */
+    private boolean saleInFlight;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -80,12 +101,22 @@ public class QRPayActivity extends BaseAppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Returning here always means a new sale — whether the last QR was paid,
+        // cancelled or expired. Carrying the previous amount over would leave the
+        // operator looking at stale data from a finished transaction.
+        resetAmount();
         showInputState();
     }
 
     private void showInputState() {
+        saleInFlight = false;
         layoutInput.setVisibility(View.VISIBLE);
         layoutLoading.setVisibility(View.GONE);
+    }
+
+    private void resetAmount() {
+        amountBuilder.replace(0, amountBuilder.length(), "0");
+        tvAmountInput.setText(amountBuilder.toString());
     }
 
     private void showLoadingState(String message) {
@@ -97,7 +128,14 @@ public class QRPayActivity extends BaseAppCompatActivity {
     private void appendDigit(String digit) {
         int dotIdx = amountBuilder.indexOf(".");
         if (dotIdx >= 0 && (amountBuilder.length() - dotIdx) > 2) return;
-        if (amountBuilder.toString().equals("0") && !digit.equals(".")) {
+        boolean replacingZero = amountBuilder.toString().equals("0");
+        // Cap the whole-AED part. Without this an operator can type a value long
+        // enough that amountAed * 100 loses integer precision as a double, so the
+        // fils figure sent to the gateway would no longer match what is on screen.
+        if (dotIdx < 0 && !replacingZero && amountBuilder.length() >= QRConfig.MAX_INTEGER_DIGITS) {
+            return;
+        }
+        if (replacingZero) {
             amountBuilder.setLength(0);
         }
         amountBuilder.append(digit);
@@ -119,51 +157,81 @@ public class QRPayActivity extends BaseAppCompatActivity {
         tvAmountInput.setText(amountBuilder.toString());
     }
 
-    private void onGenerateClicked() {
+    /** Keypad buffer without a dangling decimal point, e.g. "12." becomes "12". */
+    private String amountText() {
+        String amountStr = amountBuilder.toString();
+        if (amountStr.endsWith(".")) amountStr = amountStr.substring(0, amountStr.length() - 1);
+        return amountStr;
+    }
+
+    /**
+     * Validates the keypad buffer and converts it to fils, reporting the reason
+     * to the operator if it cannot be sent.
+     *
+     * @return the amount in fils, or -1 when no QR must be generated.
+     */
+    private long resolveAmountFils() {
+        double amountAed;
         try {
-            String amountStr = amountBuilder.toString();
-            if (amountStr.endsWith(".")) amountStr = amountStr.substring(0, amountStr.length() - 1);
-            double amountAed = Double.parseDouble(amountStr);
-            if (amountAed <= 0) throw new NumberFormatException("zero");
-            final long amountFils = Math.round(amountAed * 100);
-            final String finalAmountStr = amountStr;
-            final String requestId = UUID.randomUUID().toString();
-            lastRequestId = requestId;
-
-            showLoadingState(getString(R.string.qr_pay_status_preparing));
-
-            ApiKeyManager.get().ensureReady(
-                () -> {
-                    if (isFinishing()) return;
-                    tvLoadingStatus.setText(R.string.qr_pay_status_generating);
-                    generateQR(amountFils, finalAmountStr, requestId);
-                },
-                errorMsg -> {
-                    if (isFinishing()) return;
-                    showInputState();
-                    showToast(errorMsg);
-                }
-            );
+            amountAed = Double.parseDouble(amountText());
         } catch (NumberFormatException e) {
             showToast(R.string.qr_pay_amount_error);
+            return -1;
         }
+        if (amountAed <= 0) {
+            showToast(R.string.qr_pay_amount_error);
+            return -1;
+        }
+        long amountFils = Math.round(amountAed * 100);
+        if (amountFils < QRConfig.MIN_AMOUNT_FILS) {
+            showToast(getString(R.string.qr_pay_amount_below_min,
+                QRConfig.filsToAedText(QRConfig.MIN_AMOUNT_FILS)));
+            return -1;
+        }
+        if (amountFils > QRConfig.MAX_AMOUNT_FILS) {
+            showToast(getString(R.string.qr_pay_amount_above_max,
+                QRConfig.filsToAedText(QRConfig.MAX_AMOUNT_FILS)));
+            return -1;
+        }
+        return amountFils;
+    }
+
+    private void onGenerateClicked() {
+        if (saleInFlight) return;
+        long amountFils = resolveAmountFils();
+        if (amountFils < 0) return;
+        saleInFlight = true;
+
+        final String amountDisplay = amountText();
+        final String requestId = UUID.randomUUID().toString();
+        lastRequestId = requestId;
+
+        showLoadingState(getString(R.string.qr_pay_status_preparing));
+
+        ApiKeyManager.get().ensureReady(
+            () -> {
+                if (isFinishing()) return;
+                tvLoadingStatus.setText(R.string.qr_pay_status_generating);
+                generateQR(amountFils, amountDisplay, requestId);
+            },
+            errorMsg -> {
+                if (isFinishing()) return;
+                showInputState();
+                showToast(errorMsg);
+            }
+        );
     }
 
     private void onNfcPayClicked() {
-        try {
-            String amountStr = amountBuilder.toString();
-            if (amountStr.endsWith(".")) amountStr = amountStr.substring(0, amountStr.length() - 1);
-            double amountAed = Double.parseDouble(amountStr);
-            if (amountAed <= 0) throw new NumberFormatException("zero");
-            // NFC pay writes wallet info directly to HCE — no API call needed.
-            // The iOS ddwallet app reads walletId + amount from the tag and
-            // initiates the P2M transfer entirely on the phone side.
-            Intent intent = new Intent(this, NFCPayActivity.class);
-            intent.putExtra(NFCPayActivity.EXTRA_AMOUNT_AED, amountStr);
-            startActivity(intent);
-        } catch (NumberFormatException e) {
-            showToast(R.string.qr_pay_amount_error);
-        }
+        if (saleInFlight) return;
+        if (resolveAmountFils() < 0) return;
+        saleInFlight = true;
+        // NFC pay: calls /qr/generate to get emvPayload, writes ddwallet://nfc?emvPayload=...
+        // to the HCE tag. The wallet app reads the tag and calls validateQR(emvPayload)
+        // to get all payment details, then completes P2M payment autonomously.
+        Intent intent = new Intent(this, NFCPayActivity.class);
+        intent.putExtra(NFCPayActivity.EXTRA_AMOUNT_AED, amountText());
+        startActivity(intent);
     }
 
     private void generateQR(long amountFils, String amountDisplayAed, String requestId) {
@@ -174,9 +242,13 @@ public class QRPayActivity extends BaseAppCompatActivity {
         try {
             JSONObject body = new JSONObject();
             String walletId = PreferencesUtil.getWalletId();
+            body.put("messageTypeId", QRConfig.QR_MESSAGE_TYPE_ID);
             body.put("qrType", QRConfig.QR_TYPE);
             body.put("walletId", walletId.isEmpty() ? QRConfig.getDefaultWalletId() : walletId);
             body.put("amount", amountFils);
+            // Stated explicitly even at zero, so the QR carries a commission split
+            // that any later refund can reverse without guessing.
+            body.put("commissionAmount", QRConfig.QR_COMMISSION_AMOUNT);
             body.put("currency", QRConfig.CURRENCY);
             body.put("terminalId", QRConfig.TERMINAL_ID);
             body.put("tradingLicenseNumber", QRConfig.TRADING_LICENSE_NUMBER);
@@ -194,9 +266,12 @@ public class QRPayActivity extends BaseAppCompatActivity {
                 reqBuilder.addHeader("X-LFI-API-KEY", apiKey);
             }
 
-            httpClient.newCall(reqBuilder.build()).enqueue(new Callback() {
+            httpClient().newCall(reqBuilder.build()).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
+                    // AC-7: a generation attempt that never reached the gateway must
+                    // still be traceable, and requestId is what correlates it.
+                    Log.e(TAG, "generateQR failed, requestId=" + requestId, e);
                     runOnUiThread(() -> {
                         showInputState();
                         showToast(getString(R.string.qr_pay_error_network) + ": " + e.getMessage());
@@ -230,24 +305,34 @@ public class QRPayActivity extends BaseAppCompatActivity {
                     if (!response.isSuccessful()) {
                         runOnUiThread(() -> {
                             showInputState();
-                            showToast(getString(R.string.qr_pay_error_network) + " (HTTP " + response.code() + ")");
+                            showToast(getString(R.string.qr_pay_error_network) + ": "
+                                + QRConfig.errorTextOf(responseBody, response));
                         });
                         return;
                     }
                     try {
                         JSONObject json = new JSONObject(responseBody);
-                        String emvPayload = json.getString("emvPayload");
+                        String emvPayload = QRConfig.emvFrom(json);
+                        long ttlMs = QRConfig.ttlMsFrom(json);
                         runOnUiThread(() -> {
                             Intent intent = new Intent(QRPayActivity.this, QRDisplayActivity.class);
                             intent.putExtra(QRDisplayActivity.EXTRA_EMV_PAYLOAD, emvPayload);
                             intent.putExtra(QRDisplayActivity.EXTRA_AMOUNT_AED, amountDisplayAed);
                             intent.putExtra(QRDisplayActivity.EXTRA_REQUEST_ID, requestId);
+                            intent.putExtra(QRDisplayActivity.EXTRA_TTL_MS, ttlMs);
+                            intent.putExtra(QRDisplayActivity.EXTRA_COMMISSION_FILS,
+                                QRConfig.QR_COMMISSION_AMOUNT);
                             startActivity(intent);
                         });
                     } catch (Exception e) {
+                        // A 2xx that isn't parseable gateway JSON is almost always the
+                        // Cloudflare Access page, not a malformed response.
+                        String reason = QRConfig.looksLikeHtmlPage(responseBody)
+                            ? QRConfig.errorTextOf(responseBody, response)
+                            : getString(R.string.qr_pay_error_parse);
                         runOnUiThread(() -> {
                             showInputState();
-                            showToast(getString(R.string.qr_pay_error_parse));
+                            showToast(reason);
                         });
                     }
                 }

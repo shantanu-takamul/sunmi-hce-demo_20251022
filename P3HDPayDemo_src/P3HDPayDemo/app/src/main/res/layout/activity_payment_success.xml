@@ -28,12 +28,19 @@
                 android:gravity="center"
                 android:orientation="vertical">
 
+                <!--
+                  Hero state. Swapped wholesale when a cancel succeeds — see
+                  PaymentSuccessActivity#showVoidedHero. Ids exist purely so that
+                  swap is possible; a void must not sit under a green tick.
+                -->
                 <FrameLayout
+                    android:id="@+id/frame_status_icon"
                     android:layout_width="104dp"
                     android:layout_height="104dp"
                     android:background="@drawable/bg_soft_success_circle">
 
                     <ImageView
+                        android:id="@+id/iv_status_icon"
                         android:layout_width="54dp"
                         android:layout_height="54dp"
                         android:layout_gravity="center"
@@ -42,11 +49,21 @@
                 </FrameLayout>
 
                 <TextView
+                    android:id="@+id/tv_status_heading"
                     style="@style/TextScreenTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
                     android:text="@string/payment_success_heading" />
+
+                <TextView
+                    android:id="@+id/tv_status_subtext"
+                    style="@style/TextBodyMuted"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:visibility="gone" />
 
                 <com.google.android.material.card.MaterialCardView
                     style="@style/AppCard"
@@ -294,6 +311,48 @@
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
+
+    <!--
+      Return action slot. Holds at most one visible button: CANCEL while the void
+      window is open, REFUND once it has closed. Sits outside the ScrollView so it
+      stays reachable no matter how far the receipt has been scrolled — the cancel
+      window is only ten seconds and must never be below the fold.
+    -->
+    <LinearLayout
+        android:id="@+id/layout_return_action"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/screen_margin"
+        android:paddingTop="@dimen/screen_margin"
+        android:paddingEnd="@dimen/screen_margin"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_return_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:gravity="center"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_cancel_payment"
+            style="@style/DangerButton"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/button_height"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_refund_payment"
+            style="@style/DangerOutlineButton"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/button_height"
+            android:text="@string/payment_success_refund"
+            android:visibility="gone" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
